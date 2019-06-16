@@ -49,6 +49,7 @@ import org.slf4j.LoggerFactory;
  * @author Karthik Ranganathan, Greg Kim
  *
  */
+//处理单个应用的请求操作的 Resource ( Controller )
 @Produces({"application/xml", "application/json"})
 public class ApplicationResource {
     private static final Logger logger = LoggerFactory.getLogger(ApplicationResource.class);
@@ -141,8 +142,23 @@ public class ApplicationResource {
      */
     @POST
     @Consumes({"application/json", "application/xml"})
+    /*
+    eureka server 集群假定是 s1 s2
+    1）client 向 s1 注册，有一个 lastDirtyTime ，正常情况下成功， s1 会向 s2 同步
+    2）client 向 s1 注册（成功，但是网络波动），然后 client 发生状态的变化，lastDirtyTime 变化，向 s2 注册。
+    这个时候，s1 s2 是冲突的，但是他们会互相同步，实际 s2 => s1 的注册会真正成功，s1 => s2 的注册不会返回失败，但是实际 s2 处理的时候，用的是自身的。
+    心跳只是最终去校验。
+    理论来说，心跳不应该带 lastDirtyTime 参数。带的原因就是为了做固定周期的比较。
+    最优解是 注册 就处理掉数据不一致
+    次优解是 心跳 处理掉数据不一致
+    如果在类比，
+    注册，相当于 insertOrUpdate
+    心跳，附加了校验是否要发起【注册】
+     */
+    //isReplication为true，表示是从其他server同步过来的
     public Response addInstance(InstanceInfo info,
                                 @HeaderParam(PeerEurekaNode.HEADER_REPLICATION) String isReplication) {
+        // 校验参数是否合法
         logger.debug("Registering instance {} (replication={})", info.getId(), isReplication);
         // validate that the instanceinfo contains all the necessary required fields
         if (isBlank(info.getId())) {
@@ -181,7 +197,7 @@ public class ApplicationResource {
                 }
             }
         }
-
+        // 注册应用实例信息
         registry.register(info, "true".equals(isReplication));
         return Response.status(204).build();  // 204 to be backwards compatible
     }

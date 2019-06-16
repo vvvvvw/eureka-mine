@@ -55,12 +55,17 @@ public class ApplicationInfoManager {
         }
     };
 
+    //单例
     private static ApplicationInfoManager instance = new ApplicationInfoManager(null, null, null);
 
+    //状态变更监听器
     protected final Map<String, StatusChangeListener> listeners;
+    //应用实例状态匹配
     private final InstanceStatusMapper instanceStatusMapper;
 
+    //应用实例信息
     private InstanceInfo instanceInfo;
+    //应用实例配置
     private EurekaInstanceConfig config;
 
     public static class OptionalArgs {
@@ -164,6 +169,10 @@ public class ApplicationInfoManager {
      *
      * @param status Status of the instance
      */
+    //设置instance的status，该方法会触发所有注册的监听器
+    /*
+
+     */
     public synchronized void setInstanceStatus(InstanceStatus status) {
         InstanceStatus next = instanceStatusMapper.map(status);
         if (next == null) {
@@ -182,6 +191,7 @@ public class ApplicationInfoManager {
         }
     }
 
+    //注册应用实例状态变更监听器
     public void registerStatusChangeListener(StatusChangeListener listener) {
         listeners.put(listener.getId(), listener);
     }
@@ -197,10 +207,18 @@ public class ApplicationInfoManager {
      *
      * see {@link InstanceInfo#getHostName()} for explanation on why the hostname is used as the default address
      */
+    //如果主机名改变，重新获取主机名，如果主机名已经改变，更新instanceinfo中的DataCenterInfo，ip，主机信息，，并在下一次心跳时传递到服务器上
+    /*
+    关注应用实例信息的 hostName 、 ipAddr 、 dataCenterInfo 属性的变化。
+    一般情况下，我们使用的是非 RefreshableInstanceConfig 实现的配置类(
+    一般是 MyDataCenterInstanceConfig )，因为 AbstractInstanceConfig.hostInfo 是静态属性，
+    即使本机修改了 IP 等信息，Eureka-Client 进程也不会感知到
+     */
     public void refreshDataCenterInfoIfRequired() {
         String existingAddress = instanceInfo.getHostName();
 
         String newAddress;
+        //刷新data center信息、主机名、ip地址
         if (config instanceof RefreshableInstanceConfig) {
             // Refresh data center info, and return up to date address
             newAddress = ((RefreshableInstanceConfig) config).resolveDefaultAddress(true);
@@ -217,10 +235,14 @@ public class ApplicationInfoManager {
             // We will most likely re-write the client at sometime so not fixing for now.
             InstanceInfo.Builder builder = new InstanceInfo.Builder(instanceInfo);
             builder.setHostName(newAddress).setIPAddr(newIp).setDataCenterInfo(config.getDataCenterInfo());
+            //如果 newAddress 不为空并且没有改变
             instanceInfo.setIsDirty();
         }
     }
 
+    /*
+    关注应用实例信息的 renewalIntervalInSecs 、 durationInSecs 属性的变化
+     */
     public void refreshLeaseInfoIfRequired() {
         LeaseInfo leaseInfo = instanceInfo.getLeaseInfo();
         if (leaseInfo == null) {
@@ -245,6 +267,7 @@ public class ApplicationInfoManager {
     }
 
     public static interface InstanceStatusMapper {
+        //给定一个InstanceStatus，返回映射后的状态。在applicationInfoManager.setInstanceStatus时使用
 
         /**
          * given a starting {@link com.netflix.appinfo.InstanceInfo.InstanceStatus}, apply a mapping to return

@@ -42,6 +42,7 @@ public class Jersey1TransportClientFactories implements TransportClientFactories
         };
     }
 
+    //创建 registrationClient 和 queryClient 公用的委托的 EurekaHttpClientFactory
     public TransportClientFactory newTransportClientFactory(final EurekaClientConfig clientConfig,
                                                                    final Collection<ClientFilter> additionalFilters,
                                                                    final InstanceInfo myInstanceInfo) {
@@ -51,6 +52,7 @@ public class Jersey1TransportClientFactories implements TransportClientFactories
                 myInstanceInfo,
                 new EurekaClientIdentity(myInstanceInfo.getIPAddr())
         );
+        // 委托 TransportClientFactory
         final TransportClientFactory metricsFactory = MetricsCollectingEurekaHttpClient.createFactory(jerseyFactory);
 
         return new TransportClientFactory() {

@@ -69,6 +69,8 @@ import org.slf4j.LoggerFactory;
  * TODO: a lot of the networking code in this class can be replaced by newer code in
  * {@link com.netflix.discovery.DiscoveryClient}
  *
+ * 处理所有需要在其他region上被完成的注册操作
+ * 操作：获取远程region上的注册信息，周期性获取增量信息
  * @author Karthik Ranganathan
  *
  */
@@ -84,7 +86,7 @@ public class RemoteRegionRegistry implements LookupService<String> {
     // monotonically increasing generation counter to ensure stale threads do not reset registry to an older version
     private final AtomicLong fetchRegistryGeneration = new AtomicLong(0);
     private final Lock fetchRegistryUpdateLock = new ReentrantLock();
-
+    //todo ? 初始时 是获取所有应用还是根据serverConfig.getRemoteRegionAppWhitelist
     private final AtomicReference<Applications> applications = new AtomicReference<Applications>(new Applications());
     private final AtomicReference<Applications> applicationsDelta = new AtomicReference<Applications>(new Applications());
     private final EurekaServerConfig serverConfig;

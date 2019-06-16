@@ -88,7 +88,7 @@ public class ApacheHttpClientConnectionCleaner {
         cleanIdle(0);
         eurekaConnCleaner.shutdown();
     }
-
+    //关闭空闲连接
     public void cleanIdle(long delayMs) {
         Stopwatch start = executionTimeStats.start();
         try {

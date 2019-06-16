@@ -107,6 +107,12 @@ public interface EurekaServerConfig {
      * <em>The changes are effective at runtime.</em>
      * </p>
      *
+     * 是否开启自我保护模式。
+     * FROM 周立——《理解Eureka的自我保护模式》
+     * 当Eureka Server节点在短时间内丢失过多客户端时（可能发生了网络分区故障），那么这个节点就会进入自我保护模式。
+     * 一旦进入该模式，Eureka Server就会保护服务注册表中的信息，不再删除服务注册表中的数据（也就是不会注销任何微服务）。
+     * 当网络故障恢复后，该Eureka Server节点会自动退出自我保护模式。
+     *
      * @return true to enable self preservation, false otherwise.
      */
     boolean shouldEnableSelfPreservation();
@@ -121,14 +127,19 @@ public interface EurekaServerConfig {
      * <em>The changes are effective at runtime.</em>
      * </p>
      *
+     * 开启自我保护模式比例，超过该比例后开启自我保护模式。
+     *
      * @return value between 0 and 1 indicating the percentage. For example,
      *         <code>85%</code> will be specified as <code>0.85</code>.
      */
+    //是否开启自我保护的差别，在于是否执行清理过期租约逻辑。如果想关闭分批逐步过期，设置 renewalPercentThreshold = 0
     double getRenewalPercentThreshold();
 
     /**
      * The interval with which the threshold as specified in
      * {@link #getRenewalPercentThreshold()} needs to be updated.
+     *
+     * 自我保护模式比例更新频率，单位：毫秒。
      *
      * @return time in milliseconds indicating the interval.
      */
@@ -142,6 +153,8 @@ public interface EurekaServerConfig {
      * <p>
      * <em>The changes are effective at runtime.</em>
      * </p>
+     *  Eureka-Server 集群节点之间replication频率，单位：毫秒。
+     *
      *
      * @return timer in milliseconds indicating the interval.
      */
@@ -150,6 +163,7 @@ public interface EurekaServerConfig {
     /**
      * If set to true, the replicated data send in the request will be always compressed.
      * This does not define response path, which is driven by "Accept-Encoding" header.
+     * 是否开启 Eureka-Server 集群间请求压缩
      */
     boolean shouldEnableReplicatedRequestCompression();
 
@@ -160,6 +174,7 @@ public interface EurekaServerConfig {
      * <em>The changes are effective at runtime.</em>
      * </p>
      *
+     * 复制活动的重试次数
      * @return the number of retries.
      */
     int getNumberOfReplicationRetries();
@@ -170,7 +185,7 @@ public interface EurekaServerConfig {
      * <p>
      * <em>The changes are effective at runtime.</em>
      * </p>
-     *
+     * 获取关于对等节点的状态信息更新的时间间隔。
      * @return time in milliseconds indicating the interval.
      */
     int getPeerEurekaStatusRefreshTimeIntervalMs();
@@ -184,7 +199,12 @@ public interface EurekaServerConfig {
      * When the instance registry starts up empty, it builds over time when the
      * clients start to send heartbeats and the server requests the clients for
      * registration information.
+     * 获取在eureka服务器启动时无法从对等节点获取实例的等待时间。 最好不要在这些情况下开始提供权限，
+     * 因为存储在registry中的信息可能不完整。
+     * 当实例注册表启动为空时，随着时间的推移，当客户端开始发送心跳时，服务器请求客户端注册信息。
      *
+     * Eureka-Server 启动时，从远程 Eureka-Server 读取不到注册信息时，多长时间不允许 Eureka-Client 访问。
+     * TODO（后面源码在细读，可能要修正）
      * @return time in milliseconds.
      */
     int getWaitTimeInMsWhenSyncEmpty();
@@ -192,7 +212,7 @@ public interface EurekaServerConfig {
     /**
      * Gets the timeout value for connecting to peer eureka nodes for
      * replication.
-     *
+     * 【复制】远程 Eureka-Server 请求连接超时时间，单位：毫秒
      * @return timeout value in milliseconds.
      */
     int getPeerNodeConnectTimeoutMs();
@@ -200,7 +220,7 @@ public interface EurekaServerConfig {
     /**
      * Gets the timeout value for reading information from peer eureka nodes for
      * replication.
-     *
+     * 【复制】远程 Eureka-Server 请求读取超时时间，单位：毫秒
      * @return timeout value in milliseconds.
      */
     int getPeerNodeReadTimeoutMs();
@@ -208,7 +228,7 @@ public interface EurekaServerConfig {
     /**
      * Gets the total number of <em>HTTP</em> connections allowed to peer eureka
      * nodes for replication.
-     *
+     * 【复制】全部远程 Eureka-Server 请求总连接数
      * @return total number of allowed <em>HTTP</em> connections.
      */
     int getPeerNodeTotalConnections();
@@ -216,7 +236,7 @@ public interface EurekaServerConfig {
     /**
      * Gets the total number of <em>HTTP</em> connections allowed to a
      * particular peer eureka node for replication.
-     *
+     * 【复制】单个远程 Eureka-Server 请求总连接数
      * @return total number of allowed <em>HTTP</em> connections for a peer
      *         node.
      */
@@ -225,7 +245,7 @@ public interface EurekaServerConfig {
     /**
      * Gets the idle time after which the <em>HTTP</em> connection should be
      * cleaned up.
-     *
+     * 【复制】远程 Eureka-Server http连接空闲时间，单位：毫秒
      * @return idle time in seconds.
      */
     int getPeerNodeConnectionIdleTimeoutSeconds();
@@ -233,7 +253,7 @@ public interface EurekaServerConfig {
     /**
      * Get the time for which the delta information should be cached for the
      * clients to retrieve the value without missing it.
-     *
+     * 租约变更记录过期时长，单位：毫秒。
      * @return time in milliseconds
      */
     long getRetentionTimeInMSInDeltaQueue();
@@ -241,7 +261,7 @@ public interface EurekaServerConfig {
     /**
      * Get the time interval with which the clean up task should wake up and
      * check for expired delta information.
-     *
+     * 移除队列里过期的租约变更记录的定时任务执行频率，单位：毫秒。
      * @return time in milliseconds.
      */
     long getDeltaRetentionTimerIntervalInMs();
@@ -249,7 +269,7 @@ public interface EurekaServerConfig {
     /**
      * Get the time interval with which the task that expires instances should
      * wake up and run.
-     *
+     * 租约过期定时任务执行频率，单位：毫秒。
      * @return time in milliseconds.
      */
     long getEvictionIntervalTimerInMs();
@@ -280,7 +300,7 @@ public interface EurekaServerConfig {
     /**
      * Gets the time for which the registry payload should be kept in the cache
      * if it is not invalidated by change events.
-     *
+     * 注册信息读写缓存写入后过期时间，单位：秒。
      * @return time in seconds.
      */
     long getResponseCacheAutoExpirationInSeconds();
@@ -288,7 +308,8 @@ public interface EurekaServerConfig {
     /**
      * Gets the time interval with which the payload cache of the client should
      * be updated.
-     *
+     *只读缓存更新频率，单位：毫秒。
+     *只读缓存定时更新任务只更新读取过请求 (com.netflix.eureka.registry.Key)，因此虽然永不过期，也会存在读取不到的情况。
      * @return time in milliseconds.
      */
     long getResponseCacheUpdateIntervalMs();
@@ -298,6 +319,9 @@ public interface EurekaServerConfig {
      * strategy to responses. A readWrite cache with an expiration policy, and a readonly cache
      * that caches without expiry.
      *
+     *  是否开启只读请求响应缓存。
+     * 响应缓存 ( ResponseCache ) 机制目前使用两层缓存策略。
+     * 优先读取永不过期的只读缓存，读取不到后读取固定过期的读写缓存。 todo ？ 那只读缓存过期呢？
      * @return true if the read only cache is to be used
      */
     boolean shouldUseReadOnlyResponseCache();
@@ -307,7 +331,7 @@ public interface EurekaServerConfig {
      * <p>
      * <em>The changes are effective at runtime.</em>
      * </p>
-     *
+     *  TODO 芋艿：后面研究
      * @return true if the delta information is allowed to be served, false
      *         otherwise.
      */
@@ -316,19 +340,20 @@ public interface EurekaServerConfig {
     /**
      * Get the idle time for which the status replication threads can stay
      * alive.
-     *
+     * 得到状态复制线程保持alive的时间
      * @return time in minutes.
      */
     long getMaxIdleThreadInMinutesAgeForStatusReplication();
 
     /**
      * Get the minimum number of threads to be used for status replication.
-     *
+     * 得到用来复制状态的线程的最小数量
      * @return minimum number of threads to be used for status replication.
      */
     int getMinThreadsForStatusReplication();
 
     /**
+     * 同步应用实例状态最大线程数。
      * Get the maximum number of threads to be used for status replication.
      *
      * @return maximum number of threads to be used for status replication.
@@ -342,7 +367,7 @@ public interface EurekaServerConfig {
      * Depending on the memory allowed, timeout and the replication traffic,
      * this value can vary.
      * </p>
-     *
+     * 待执行同步应用实例状态事件缓冲最大数量。
      * @return the maximum number of replication events that can be allowed to
      *         back up.
      */
@@ -353,7 +378,7 @@ public interface EurekaServerConfig {
      * <p>
      * <em>The changes are effective at runtime.</em>
      * </p>
-     *
+     *是否同步应用实例信息，当应用实例信息最后更新时间戳( lastDirtyTimestamp )发生改变。
      * @return true, to synchronize, false otherwise.
      */
     boolean shouldSyncWhenTimestampDiffers();
@@ -361,7 +386,7 @@ public interface EurekaServerConfig {
     /**
      * Get the number of times that a eureka node would try to get the registry
      * information from the peers during startup.
-     *
+     *Eureka-Server 启动时，从远程 Eureka-Server 读取失败重试次数。
      * @return the number of retries
      */
     int getRegistrySyncRetries();
@@ -369,6 +394,7 @@ public interface EurekaServerConfig {
     /**
      * Get the wait/sleep time between each retry sync attempts, if the prev retry failed and there are
      * more retries to attempt.
+     * Eureka-Server 启动时，从远程 Eureka-Server 读取失败等待( sleep )间隔，单位：毫秒。
      *
      * @return the wait time in ms between each sync retries
      */
@@ -377,12 +403,12 @@ public interface EurekaServerConfig {
     /**
      * Get the maximum number of replication events that can be allowed to back
      * up in the replication pool. This replication pool is responsible for all
-     * events except status updates.
+     * events except status updates. todo ? 为什么除了状态更新
      * <p>
      * Depending on the memory allowed, timeout and the replication traffic,
      * this value can vary.
      * </p>
-     *
+     * 待执行同步应用实例信息事件缓冲最大数量，服务器之间replication使用
      * @return the maximum number of replication events that can be allowed to
      *         back up.
      */
@@ -404,7 +430,7 @@ public interface EurekaServerConfig {
 
     /**
      * Get the maximum number of threads to be used for replication.
-     *
+     * 同步应用实例信息最大线程数
      * @return maximum number of threads to be used for replication.
      */
     int getMaxThreadsForPeerReplication();
@@ -418,7 +444,7 @@ public interface EurekaServerConfig {
      * The default value of -1 is interpreted as a marker to not compare
      * the number of replicas. This would be done to either disable this check
      * or to run eureka in a single node configuration.
-     * 
+     * 跳过：AWS 使用
      * @return minimum number of available peer replication instances
      *         for this instance to be considered healthy.
      */
@@ -427,7 +453,7 @@ public interface EurekaServerConfig {
     /**
      * Get the time in milliseconds to try to replicate before dropping
      * replication events.
-     *
+     * 执行单个同步应用实例信息状态任务最大时间
      * @return time in milliseconds
      */
     int getMaxTimeForReplication();
@@ -436,6 +462,7 @@ public interface EurekaServerConfig {
      * Checks whether the connections to replicas should be primed. In AWS, the
      * firewall requires sometime to establish network connection for new nodes.
      *
+     * 跳过：AWS 使用
      * @return true, if connections should be primed, false otherwise.
      */
     boolean shouldPrimeAwsReplicaConnections();
@@ -446,7 +473,7 @@ public interface EurekaServerConfig {
      * <p>
      * <em>The changes are effective at runtime.</em>
      * </p>
-     *
+     * // TODO ? 后面研究
      * @return true if the delta information is allowed to be served, false
      *         otherwise.
      */
@@ -455,7 +482,7 @@ public interface EurekaServerConfig {
     /**
      * Gets the timeout value for connecting to peer eureka nodes for remote
      * regions.
-     *
+     * 【读取】远程 Eureka-Server 请求连接超时时间，单位：毫秒
      * @return timeout value in milliseconds.
      */
     int getRemoteRegionConnectTimeoutMs();
@@ -463,7 +490,7 @@ public interface EurekaServerConfig {
     /**
      * Gets the timeout value for reading information from peer eureka nodes for
      * remote regions.
-     *
+     * 【读取】远程 Eureka-Server 请求读取超时时间，单位：毫秒
      * @return timeout value in milliseconds.
      */
     int getRemoteRegionReadTimeoutMs();
@@ -471,7 +498,7 @@ public interface EurekaServerConfig {
     /**
      * Gets the total number of <em>HTTP</em> connections allowed to peer eureka
      * nodes for remote regions.
-     *
+     *【读取】所有远程 Eureka-Server 请求总连接数
      * @return total number of allowed <em>HTTP</em> connections.
      */
 
@@ -480,7 +507,7 @@ public interface EurekaServerConfig {
     /**
      * Gets the total number of <em>HTTP</em> connections allowed to a
      * particular peer eureka node for remote regions.
-     *
+     * 【读取】单个远程 Eureka-Server 请求总连接数
      * @return total number of allowed <em>HTTP</em> connections for a peer
      *         node.
      */
@@ -489,7 +516,7 @@ public interface EurekaServerConfig {
     /**
      * Gets the idle time after which the <em>HTTP</em> connection should be
      * cleaned up for remote regions.
-     *
+     * 【读取】远程 Eureka-Server 请求空闲超时时间，单位：毫秒
      * @return idle time in seconds.
      */
     int getRemoteRegionConnectionIdleTimeoutSeconds();
@@ -499,13 +526,17 @@ public interface EurekaServerConfig {
      * compressed for remote regions whenever it is supported by the server. The
      * registry information from the eureka server is compressed for optimum
      * network traffic.
-     *
+     * 是否 GZIP 解压 从远程 Eureka-Server 的内容
      * @return true, if the content need to be compressed, false otherwise.
      */
     boolean shouldGZipContentFromRemoteRegion();
 
     /**
      * Get a map of region name against remote region discovery url.
+     *
+     * 远程 Eureka-Server 映射
+     * key：Eureka-Server 名
+     * value：Eureka-Server 地址
      *
      * @return - An unmodifiable map of remote region name against remote region discovery url. Empty map if no remote
      * region url is defined.
@@ -517,6 +548,7 @@ public interface EurekaServerConfig {
      * @return - array of string representing {@link java.net.URL}s.
      * @deprecated Use {@link #getRemoteRegionUrlsWithName()}
      */
+    @Deprecated
     String[] getRemoteRegionUrls();
 
     /**
@@ -531,29 +563,36 @@ public interface EurekaServerConfig {
      *
      * @return A set of application names which must be retrieved from the passed region. If <code>null</code> all
      * applications must be retrieved.
+     * 可以拉取的远程 region 应用 白名单。如果为null，则拉取所有应用
+     *
      */
     @Nullable
     Set<String> getRemoteRegionAppWhitelist(@Nullable String regionName);
 
     /**
+     * 远程 Eureka-Server 拉取注册信息的间隔，单位：秒
      * Get the time interval for which the registry information need to be fetched from the remote region.
      * @return time in seconds.
      */
     int getRemoteRegionRegistryFetchInterval();
 
     /**
+     * 远程 Eureka-Server 拉取注册信息的线程池大小
+     *
      * Size of a thread pool used to execute remote region registry fetch requests. Delegating these requests
      * to internal threads is necessary workaround to https://bugs.openjdk.java.net/browse/JDK-8049846 bug.
      */
     int getRemoteRegionFetchThreadPoolSize();
 
     /**
+     * 远程 Eureka-Server 信任存储文件
      * Gets the fully qualified trust store file that will be used for remote region registry fetches.
      * @return
      */
     String getRemoteRegionTrustStore();
 
     /**
+     * 远程 Eureka-Server 信任存储文件的密码
      * Get the remote region trust store's password.
      */
     String getRemoteRegionTrustStorePassword();
@@ -561,54 +600,65 @@ public interface EurekaServerConfig {
     /**
      * Old behavior of fallback to applications in the remote region (if configured) if there are no instances of that
      * application in the local region, will be disabled.
-     *
+     * 是否禁用"本地读取不到注册信息，从远程region Eureka-Server 读取"的功能
      * @return {@code true} if the old behavior is to be disabled.
      */
     boolean disableTransparentFallbackToOtherRegion();
 
     /**
      * Indicates whether the replication between cluster nodes should be batched for network efficiency.
+     * 指示是否应批量集群节点之间的复制以实现网络效率。
      * @return {@code true} if the replication needs to be batched.
      */
     boolean shouldBatchReplication();
 
     /**
      * Indicates whether the eureka server should log/metric clientAuthHeaders
+     *  打印访问的客户端名和版本号，配合 Netflix Servo 实现监控信息采集。
      * @return {@code true} if the clientAuthHeaders should be logged and/or emitted as metrics
      */
     boolean shouldLogIdentityHeaders();
 
     /**
      * Indicates whether the rate limiter should be enabled or disabled.
+     * 请求限流是否开启
      */
     boolean isRateLimiterEnabled();
 
     /**
      * Indicate if rate limit standard clients. If set to false, only non standard clients
      * will be rate limited.
+     * 是否限速标准客户端，如果设置为false，只有非标准客户端才会被限速
+     * 标准客户端通过请求头( header )的 "DiscoveryIdentity-Name" 来判断，是否在限流的非标准客户端集合里。
      */
     boolean isRateLimiterThrottleStandardClients();
 
     /**
      * A list of certified clients. This is in addition to standard eureka Java clients.
+     * 不用限速的标准客户端集合
+     * 不用限速的标准客户端集合。默认包含"DefaultClient" 和 "DefaultServer" 。
      */
     Set<String> getRateLimiterPrivilegedClients();
 
     /**
      * Rate limiter, token bucket algorithm property. See also {@link #getRateLimiterRegistryFetchAverageRate()}
      * and {@link #getRateLimiterFullFetchAverageRate()}.
+     * 速率限制的 burst size ，使用令牌桶算法。 TODO 芋艿：算法
      */
     int getRateLimiterBurstSize();
 
     /**
      * Rate limiter, token bucket algorithm property. Specifies the average enforced request rate.
      * See also {@link #getRateLimiterBurstSize()}.
+     * 增量拉取注册信息的速率限制
      */
     int getRateLimiterRegistryFetchAverageRate();
 
     /**
      * Rate limiter, token bucket algorithm property. Specifies the average enforced request rate.
      * See also {@link #getRateLimiterBurstSize()}.
+     *
+     * 全量拉取注册信息的速率限制
      */
     int getRateLimiterFullFetchAverageRate();
 
@@ -618,11 +668,13 @@ public interface EurekaServerConfig {
     String getListAutoScalingGroupsRoleName();
 
     /**
+     * JSON 编解码器名
      * @return the class name of the full json codec to use for the server. If none set a default codec will be used
      */
     String getJsonCodecName();
 
     /**
+     * XML 编解码器名
      * @return the class name of the full xml codec to use for the server. If none set a default codec will be used
      */
     String getXmlCodecName();
@@ -667,6 +719,7 @@ public interface EurekaServerConfig {
      * To avoid configuration API pollution when trying new/experimental or features or for the migration process,
      * the corresponding configuration can be put into experimental configuration section.
      *
+     * 获得实验性属性值
      * @return a property of experimental feature
      */
     String getExperimental(String name);

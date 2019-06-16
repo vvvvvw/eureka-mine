@@ -67,6 +67,7 @@ public final class EurekaHttpClients {
         return canonicalClientFactory(EurekaClientNames.REGISTRATION, transportConfig, bootstrapResolver, transportClientFactory);
     }
 
+    //内部有 SessionedEurekaHttpClient 的创建工厂,创建SessionedEurekaHttpClient>>RetryableEurekaHttpClient>>RedirectingEurekaHttpClient包装的httpclient
     static EurekaHttpClientFactory canonicalClientFactory(final String name,
                                                           final EurekaTransportConfig transportConfig,
                                                           final ClusterResolver<EurekaEndpoint> clusterResolver,
@@ -107,6 +108,7 @@ public final class EurekaHttpClients {
             final InstanceInfo myInstanceInfo,
             final ApplicationsResolver.ApplicationsSource applicationsSource)
     {
+        //组合解析器，用于 Eureka 1.x 对 Eureka 2.x 的兼容配置，暂时不需要了解
         if (COMPOSITE_BOOTSTRAP_STRATEGY.equals(transportConfig.getBootstrapResolverStrategy())) {
             if (clientConfig.shouldFetchRegistry()) {
                 return compositeBootstrapResolver(
@@ -121,7 +123,7 @@ public final class EurekaHttpClients {
                         " Falling back to using a default bootstrap resolver.");
             }
         }
-
+        //调用 `#defaultBootstrapResolver()` 方法，创建默认的解析器 AsyncResolver
         // if all else fails, return the default
         return defaultBootstrapResolver(clientConfig, myInstanceInfo);
     }
@@ -132,22 +134,30 @@ public final class EurekaHttpClients {
      */
     static ClosableResolver<AwsEndpoint> defaultBootstrapResolver(final EurekaClientConfig clientConfig,
                                                                   final InstanceInfo myInstanceInfo) {
+        // 获得 可用区集合
         String[] availZones = clientConfig.getAvailabilityZones(clientConfig.getRegion());
+        // 获得 应用实例的 可用区
         String myZone = InstanceInfo.getZone(availZones, myInstanceInfo);
 
+        //创建 ZoneAffinityClusterResolver 。在 ZoneAffinityClusterResolver 构造方法的参数，我们看到创建 ConfigClusterResolver 作为 `delegate` 参数。
+        // 创建 ZoneAffinityClusterResolver
         ClusterResolver<AwsEndpoint> delegateResolver = new ZoneAffinityClusterResolver(
                 new ConfigClusterResolver(clientConfig, myInstanceInfo),
                 myZone,
                 true
         );
 
+        //调用 `ZoneAffinityClusterResolver#getClusterEndpoints()` 方法，**第一次 Eureka-Server EndPoint 集群解析。
+        // 第一次 EndPoint 解析
         List<AwsEndpoint> initialValue = delegateResolver.getClusterEndpoints();
+        // 解析不到 Eureka-Server EndPoint ，快速失败
         if (initialValue.isEmpty()) {
             String msg = "Initial resolution of Eureka server endpoints failed. Check ConfigClusterResolver logs for more info";
             logger.error(msg);
             failFastOnInitCheck(clientConfig, msg);
         }
 
+        // 创建 AsyncResolver
         return new AsyncResolver<>(
                 EurekaClientNames.BOOTSTRAP,
                 delegateResolver,
@@ -318,6 +328,7 @@ public final class EurekaHttpClients {
         };
     }
 
+    //解析不到 Eureka-Server EndPoint 集群时，可以通过配置( `eureka.experimental.clientTransportFailFastOnInit=true` )，使 Eureka-Client 初始化失败。`#failFastOnInitCheck(...)` 方法，实现代码如下：
     // potential future feature, guarding with experimental flag for now
     private static void failFastOnInitCheck(EurekaClientConfig clientConfig, String msg) {
         if ("true".equals(clientConfig.getExperimental("clientTransportFailFastOnInit"))) {

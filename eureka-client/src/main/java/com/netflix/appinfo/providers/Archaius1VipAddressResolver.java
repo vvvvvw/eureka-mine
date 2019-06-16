@@ -13,6 +13,7 @@ public class Archaius1VipAddressResolver implements VipAddressResolver {
 
     private static final Pattern VIP_ATTRIBUTES_PATTERN = Pattern.compile("\\$\\{(.*?)\\}");
 
+    //使用properties来替换表达式
     @Override
     public String resolveDeploymentContextBasedVipAddresses(String vipAddressMacro) {
         if (vipAddressMacro == null) {

@@ -24,18 +24,27 @@ import org.slf4j.LoggerFactory;
  */
 public class TimedSupervisorTask extends TimerTask {
     private static final Logger logger = LoggerFactory.getLogger(TimedSupervisorTask.class);
-
+    //定时任务服务
     private final Counter timeoutCounter;
+    //执行子任务线程池
     private final Counter rejectedCounter;
     private final Counter throwableCounter;
     private final LongGauge threadPoolLevelGauge;
-
+    //定时任务服务
     private final ScheduledExecutorService scheduler;
+    //执行子任务线程池
     private final ThreadPoolExecutor executor;
+    //子任务执行超时时间
     private final long timeoutMillis;
+    //子任务
     private final Runnable task;
-
+    //当前任子务执行频率
     private final AtomicLong delay;
+    /**
+     *  最大子任务执行频率
+     *
+     * 子任务执行超时情况下使用
+     */
     private final long maxDelay;
 
     public TimedSupervisorTask(String name, ScheduledExecutorService scheduler, ThreadPoolExecutor executor,

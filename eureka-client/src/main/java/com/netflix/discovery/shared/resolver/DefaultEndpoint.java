@@ -26,15 +26,20 @@ import java.util.List;
  */
 public class DefaultEndpoint implements EurekaEndpoint {
 
+    //网络地址
     protected final String networkAddress;
+    //端口
     protected final int port;
+    //是否安全( https )
     protected final boolean isSecure;
+    //相对地址
     protected final String relativeUri;
+    //完整的服务 URL
     protected final String serviceUrl;
 
     public DefaultEndpoint(String serviceUrl) {
         this.serviceUrl = serviceUrl;
-
+        // 将 serviceUrl 分解成 几个属性
         try {
             URL url = new URL(serviceUrl);
             this.networkAddress = url.getHost();
@@ -51,7 +56,7 @@ public class DefaultEndpoint implements EurekaEndpoint {
         this.port = port;
         this.isSecure = isSecure;
         this.relativeUri = relativeUri;
-
+        // 几个属性 拼接成 serviceUrl
         StringBuilder sb = new StringBuilder()
                 .append(isSecure ? "https" : "http")
                 .append("://")
@@ -112,6 +117,7 @@ public class DefaultEndpoint implements EurekaEndpoint {
         return eurekaEndpoints;
     }
 
+    //所有字段是否都相等
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -128,6 +134,7 @@ public class DefaultEndpoint implements EurekaEndpoint {
         return true;
     }
 
+    //重写hashcode
     @Override
     public int hashCode() {
         int result = networkAddress != null ? networkAddress.hashCode() : 0;

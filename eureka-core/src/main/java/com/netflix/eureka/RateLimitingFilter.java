@@ -84,6 +84,7 @@ import org.slf4j.LoggerFactory;
  *
  * @author Tomasz Bak
  */
+//请求限流过滤器
 @Singleton
 public class RateLimitingFilter implements Filter {
 
@@ -100,11 +101,13 @@ public class RateLimitingFilter implements Filter {
     /**
      * Includes both full and delta fetches.
      */
+    //全量和增量同时使用
     private static final RateLimiter registryFetchRateLimiter = new RateLimiter(TimeUnit.SECONDS);
 
     /**
      * Only full registry fetches.
      */
+    //全量使用
     private static final RateLimiter registryFullFetchRateLimiter = new RateLimiter(TimeUnit.SECONDS);
 
     private EurekaServerConfig serverConfig;
@@ -129,17 +132,24 @@ public class RateLimitingFilter implements Filter {
 
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
+        // 获得 Target
         Target target = getTarget(request);
+        //如果不为全量/增量/Application，则直接调用
         if (target == Target.Other) {
             chain.doFilter(request, response);
             return;
         }
 
         HttpServletRequest httpRequest = (HttpServletRequest) request;
-
+        // 判断是否被限流
         if (isRateLimited(httpRequest, target)) {
+            // 监控相关
             incrementStats(target);
+            // 如果开启限流，返回 503 状态码
+            //若 eureka.rateLimiter.enabled = true( 默认值 ：false ，可配 )，返回 503 状态码
             if (serverConfig.isRateLimiterEnabled()) {
+                //503是一种HTTP状态码。英文名为503 Service Unavailable，与404（404 Not Found）
+                //同属一种网页状态出错码。前者是服务器出错的一种返回状态，后者是网页程序没有相关结果后返回的一种状态
                 ((HttpServletResponse) response).setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
                 return;
             }
@@ -147,6 +157,8 @@ public class RateLimitingFilter implements Filter {
         chain.doFilter(request, response);
     }
 
+    //RateLimitingFilter 只对符合正在表达式 ^.*/apps(/[^/]*)?$ 的GET接口做限流，
+    // 其中不包含 Eureka-Server 集群批量同步接口
     private static Target getTarget(ServletRequest request) {
         Target target = Target.Other;
         if (request instanceof HttpServletRequest) {
@@ -157,10 +169,13 @@ public class RateLimitingFilter implements Filter {
                 Matcher matcher = TARGET_RE.matcher(pathInfo);
                 if (matcher.matches()) {
                     if (matcher.groupCount() == 0 || matcher.group(1) == null || "/".equals(matcher.group(1))) {
+                        //全量
                         target = Target.FullFetch;
                     } else if ("/delta".equals(matcher.group(1))) {
+                        //增量
                         target = Target.DeltaFetch;
                     } else {
+                        //Application
                         target = Target.Application;
                     }
                 }
@@ -172,11 +187,14 @@ public class RateLimitingFilter implements Filter {
         return target;
     }
 
+    //返回false，表示允许流量通过；为true，表示不允许流量通过
     private boolean isRateLimited(HttpServletRequest request, Target target) {
+        // 判断是否特权应用
         if (isPrivileged(request)) {
             logger.debug("Privileged {} request", target);
             return false;
         }
+        // 判断是否被超载( 限流 )
         if (isOverloaded(target)) {
             logger.debug("Overloaded {} request; discarding it", target);
             return true;
@@ -185,27 +203,36 @@ public class RateLimitingFilter implements Filter {
         return false;
     }
 
+    //返回true，则不限速该客户端，否则，限速该客户端
     private boolean isPrivileged(HttpServletRequest request) {
+        //是否限速标准客户端
         if (serverConfig.isRateLimiterThrottleStandardClients()) {
             return false;
         }
+        // 以请求头( "DiscoveryIdentity-Name" ) 判断是否在标准客户端名集合内
         Set<String> privilegedClients = serverConfig.getRateLimiterPrivilegedClients();
         String clientName = request.getHeader(AbstractEurekaIdentity.AUTH_NAME_HEADER_KEY);
         return privilegedClients.contains(clientName) || DEFAULT_PRIVILEGED_CLIENTS.contains(clientName);
     }
 
+    //判断是否超载( 限流 )
     private boolean isOverloaded(Target target) {
+        //得到最大突发流量
         int maxInWindow = serverConfig.getRateLimiterBurstSize();
+        //平均请求速率
         int fetchWindowSize = serverConfig.getRateLimiterRegistryFetchAverageRate();
+        //是否过载
         boolean overloaded = !registryFetchRateLimiter.acquire(maxInWindow, fetchWindowSize);
 
         if (target == Target.FullFetch) {
             int fullFetchWindowSize = serverConfig.getRateLimiterFullFetchAverageRate();
+            //查看全量ratelimit，判断是否过载
             overloaded |= !registryFullFetchRateLimiter.acquire(maxInWindow, fullFetchWindowSize);
         }
         return overloaded;
     }
 
+    //修改监测数据
     private void incrementStats(Target target) {
         if (serverConfig.isRateLimiterEnabled()) {
             EurekaMonitors.RATE_LIMITED.increment();

@@ -43,6 +43,7 @@ import org.slf4j.LoggerFactory;
  *
  * @author Tomasz Bak
  */
+//寻找非 302 重定向的 Eureka-Server 的 EurekaHttpClient
 public class RedirectingEurekaHttpClient extends EurekaHttpClientDecorator {
 
     private static final Logger logger = LoggerFactory.getLogger(RedirectingEurekaHttpClient.class);
@@ -72,23 +73,34 @@ public class RedirectingEurekaHttpClient extends EurekaHttpClientDecorator {
 
     @Override
     protected <R> EurekaHttpResponse<R> execute(RequestExecutor<R> requestExecutor) {
+        // 未找到非 302 的 Eureka-Server
         EurekaHttpClient currentEurekaClient = delegateRef.get();
         if (currentEurekaClient == null) {
+            //使用初始的 serviceEndpoint ( 相当于 serviceUrls ) 创建委托 EurekaHttpClient
             AtomicReference<EurekaHttpClient> currentEurekaClientRef = new AtomicReference<>(factory.newClient(serviceEndpoint));
             try {
+                //调用 #executeOnNewServer(...) 方法，通过执行请求的方式，寻找非 302 状态码返回的 Eureka-Server
                 EurekaHttpResponse<R> response = executeOnNewServer(requestExecutor, currentEurekaClientRef);
+                // 关闭原有的委托 EurekaHttpClient ，并设置当前成功非 302 请求的 EurekaHttpClient
+                //关闭原有的 delegateRef ( 因为此处可能存在并发，多个线程都找到非 302 状态码返回的 Eureka-Server )，
+                //并设置当前成功非 302 请求的 EurekaHttpClient 到 delegateRef
                 TransportUtils.shutdown(delegateRef.getAndSet(currentEurekaClientRef.get()));
                 return response;
             } catch (Exception e) {
                 logger.error("Request execution error", e);
+                //关闭 currentEurekaClientRef ，当请求发生异常或者超过最大重定向次数
                 TransportUtils.shutdown(currentEurekaClientRef.get());
                 throw e;
             }
         } else {
             try {
+                //意味着当前已经找到非返回 302 状态码的 Eureka-Server ，直接执行请求。
+                //注意 ：此时 Eureka-Server 再返回 302 状态码，不再处理。
+                //意味着当前已经找到非返回 302 状态码的 Eureka-Server ，直接执行请求。
                 return requestExecutor.execute(currentEurekaClient);
             } catch (Exception e) {
                 logger.error("Request execution error", e);
+                //执行请求发生异常，关闭 currentEurekaClient ，后面要重新非返回 302 状态码的 Eureka-Server
                 delegateRef.compareAndSet(currentEurekaClient, null);
                 currentEurekaClient.shutdown();
                 throw e;
@@ -96,6 +108,7 @@ public class RedirectingEurekaHttpClient extends EurekaHttpClientDecorator {
         }
     }
 
+    //获得创建RedirectingEurekaHttpClient的工厂
     public static TransportClientFactory createFactory(final TransportClientFactory delegateFactory) {
         final DnsServiceImpl dnsService = new DnsServiceImpl();
         return new TransportClientFactory() {
@@ -111,6 +124,11 @@ public class RedirectingEurekaHttpClient extends EurekaHttpClientDecorator {
         };
     }
 
+    /*
+    意味着未找到非返回 302 状态码的 Eureka-Server ，此时通过在原始传递进来的 serviceUrls 执行请求，寻找非 302 状态码返回的 Eureka-Server。
+    当返回非 302 状态码时，找到非返回 302 状态码的 Eureka-Server 。
+    当返回 302 状态码时，向新的重定向的 Eureka-Server 执行请求直到成功找到或超过最大次数。
+     */
     private <R> EurekaHttpResponse<R> executeOnNewServer(RequestExecutor<R> requestExecutor,
                                                          AtomicReference<EurekaHttpClient> currentHttpClientRef) {
         URI targetUrl = null;

@@ -129,10 +129,12 @@ public final class DnsResolver {
      * Looks up the DNS name provided in the JNDI context.
      */
     public static Set<String> getCNamesFromTxtRecord(String discoveryDnsName) throws NamingException {
+        // 从 DNS 服务器解析 TXT 记录
         Attributes attrs = dirContext.getAttributes(discoveryDnsName, new String[]{TXT_RECORD_TYPE});
         Attribute attr = attrs.get(TXT_RECORD_TYPE);
         String txtRecord = null;
         if (attr != null) {
+            // TODO 芋艿：阿里云 dns 解析，如果有空格，默认就加了 "
             txtRecord = attr.get().toString();
         }
 

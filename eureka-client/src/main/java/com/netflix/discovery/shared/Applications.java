@@ -60,6 +60,7 @@ import com.thoughtworks.xstream.annotations.XStreamImplicit;
  * @author Karthik Ranganathan
  *
  */
+//注册的应用集合
 @Serializer("com.netflix.discovery.converters.EntityBodyConverter")
 @XStreamAlias("applications")
 @JsonRootName("applications")
@@ -80,12 +81,19 @@ public class Applications {
 
     private static final String STATUS_DELIMITER = "_";
 
+    //应用集合一致性哈希码
+    //appsHashCode = ${status}_${count}_
+    //使用每个应用实例状态( status ) + 数量( count )拼接出一致性哈希码。若数量为 0 ，该应用实例状态不进行拼接。状态以字符串大小排序。
+    //举个例子，8 个 UP ，0 个 DOWN ，则 appsHashCode = UP_8_ 。8 个 UP ，2 个 DOWN ，则 appsHashCode = DOWN_2_UP_8_
     private String appsHashCode;
     private Long versionDelta;
     @XStreamImplicit
     private final AbstractQueue<Application> applications;
+    //key:appname,value:Application
     private final Map<String, Application> appNameApplicationMap;
+    //key：vipaddress，value：VipIndexSupport
     private final Map<String, VipIndexSupport> virtualHostNameAppMap;
+    //key：secureVipaddress，value：VipIndexSupport
     private final Map<String, VipIndexSupport> secureVirtualHostNameAppMap;
 
     /**
@@ -142,7 +150,7 @@ public class Applications {
      * application name.
      *
      * @param appName
-     *            the application name for which the result need to be fetched.
+     *            the application name for which the result need to be fetched
      * @return the list of registered applications for the given application
      *         name.
      */
@@ -229,10 +237,13 @@ public class Applications {
      * @return the internal hash code representation indicating the information
      *         about the instances.
      */
+    //所有注册应用的一致性hashCode表示(//其实是应用状态名字和对应状态应用数量的字符串，实现是这样)
     @JsonIgnore
     public String getReconcileHashCode() {
+        // 计数集合 key：应用实例状态
         TreeMap<String, AtomicInteger> instanceCountMap = new TreeMap<String, AtomicInteger>();
         populateInstanceCountMap(instanceCountMap);
+        // 计算 hashcode
         return getReconcileHashCode(instanceCountMap);
     }
 
@@ -243,9 +254,12 @@ public class Applications {
      * @param instanceCountMap
      *            the map to populate
      */
+    //根据注册的实例的状态，返回map key:statusname，value：数量
     public void populateInstanceCountMap(Map<String, AtomicInteger> instanceCountMap) {
         for (Application app : this.getRegisteredApplications()) {
             for (InstanceInfo info : app.getInstancesAsIsFromEureka()) {
+                //todo lambda 漂亮
+                // 计数
                 AtomicInteger instanceCount = instanceCountMap.computeIfAbsent(info.getStatus().name(),
                         k -> new AtomicInteger(0));
                 instanceCount.incrementAndGet();
@@ -262,6 +276,8 @@ public class Applications {
      *            the instance count map to use for generating the hash
      * @return the hash code for this instance
      */
+    //哈希码用来确定自从上一次获取以来，应用是否被改变
+    //返回字符串，将instanceCountMap的key和value使用 _ 连接
     public static String getReconcileHashCode(Map<String, AtomicInteger> instanceCountMap) {
         StringBuilder reconcileHashCode = new StringBuilder(75);
         for (Map.Entry<String, AtomicInteger> mapEntry : instanceCountMap.entrySet()) {
@@ -274,9 +290,10 @@ public class Applications {
     /**
      * Shuffles the provided instances so that they will not always be returned
      * in the same order.
-     * 
+     * 将提供的实例洗牌
      * @param filterUpInstances
      *            whether to return only UP instances
+     *            是否只返回状态为UP的实例
      */
     public void shuffleInstances(boolean filterUpInstances) {
         shuffleInstances(filterUpInstances, false, null, null, null);
@@ -285,14 +302,17 @@ public class Applications {
     /**
      * Shuffles a whole region so that the instances will not always be returned
      * in the same order.
-     * 
+     * 将整个region的实例shuffle
      * @param remoteRegionsRegistry
      *            the map of remote region names to their registries
+     *            远程region的名字到registries的映射
      * @param clientConfig
      *            the {@link EurekaClientConfig}, whose settings will be used to
      *            determine whether to filter to only UP instances
+     *            客户端配置，其中包含是否过滤状态为UP的实例的配置
      * @param instanceRegionChecker
      *            the instance region checker
+     *            instanceRegionChecker
      */
     public void shuffleAndIndexInstances(Map<String, Applications> remoteRegionsRegistry,
             EurekaClientConfig clientConfig, InstanceRegionChecker instanceRegionChecker) {
@@ -300,6 +320,7 @@ public class Applications {
                 instanceRegionChecker);
     }
 
+    // shuffle 并重新设置各种实例变量
     private void shuffleInstances(boolean filterUpInstances, 
             boolean indexByRemoteRegions,
             @Nullable Map<String, Applications> remoteRegionsRegistry, 
@@ -370,7 +391,7 @@ public class Applications {
      * Add the instance to the given map based if the vip address matches with
      * that of the instance. Note that an instance can be mapped to multiple vip
      * addresses.
-     *
+     * 将以","分隔的vipAddress添加到vipMap中
      */
     private void addInstanceToMap(InstanceInfo info, String vipAddresses, Map<String, VipIndexSupport> vipMap) {
         if (vipAddresses != null) {
@@ -384,7 +405,7 @@ public class Applications {
 
     /**
      * Adds the instances to the internal vip address map.
-     * 
+     * 添加实例到内部的vip地址map
      * @param app
      *            - the applications for which the instances need to be added.
      */

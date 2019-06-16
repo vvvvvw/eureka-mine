@@ -18,11 +18,13 @@ package com.netflix.eureka;
 
 /**
  * A static holder for the server context for use in non-DI cases.
- *
+ * 在非控制反转场景下使用的服务器上下文的静态容器
  * @author David Liu
  */
 public class EurekaServerContextHolder {
 
+
+    //Eureka-Server 上下文
     private final EurekaServerContext serverContext;
 
     private EurekaServerContextHolder(EurekaServerContext serverContext) {
@@ -33,8 +35,14 @@ public class EurekaServerContextHolder {
         return this.serverContext;
     }
 
+    //持有者
     private static EurekaServerContextHolder holder;
 
+    /**
+     * 初始化
+     *
+     * @param serverContext Eureka-Server 上下文
+     */
     public static synchronized void initialize(EurekaServerContext serverContext) {
         holder = new EurekaServerContextHolder(serverContext);
     }

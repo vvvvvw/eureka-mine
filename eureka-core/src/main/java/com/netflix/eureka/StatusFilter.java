@@ -34,6 +34,7 @@ import com.netflix.appinfo.InstanceInfo.InstanceStatus;
  * Filter to check whether the eureka server is ready to take requests based on
  * its {@link InstanceStatus}.
  */
+// eureka-Server 状态过滤器。当 Eureka-Server 未处于开启( InstanceStatus.UP )状态，返回 HTTP 状态码 307 重定向
 @Singleton
 public class StatusFilter implements Filter {
 
@@ -61,6 +62,7 @@ public class StatusFilter implements Filter {
         InstanceStatus status = myInfo.getStatus();
         if (status != InstanceStatus.UP && response instanceof HttpServletResponse) {
             HttpServletResponse httpRespone = (HttpServletResponse) response;
+            //设置临时重定向
             httpRespone.sendError(SC_TEMPORARY_REDIRECT,
                     "Current node is currently not ready to serve requests -- current status: "
                             + status + " - try another DS node: ");

@@ -27,8 +27,10 @@ import java.util.Map;
  *
  * @author Tomasz Bak
  */
+//实现 Eureka-Client 请求 Eureka-Server 的网络通信
 public class JerseyApplicationClient extends AbstractJerseyEurekaHttpClient {
 
+    //自定义请求头
     private final Map<String, String> additionalHeaders;
 
     public JerseyApplicationClient(Client jerseyClient, String serviceUrl, Map<String, String> additionalHeaders) {

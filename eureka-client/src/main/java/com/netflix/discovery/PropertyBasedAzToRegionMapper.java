@@ -12,7 +12,7 @@ public class PropertyBasedAzToRegionMapper extends AbstractAzToRegionMapper {
     public PropertyBasedAzToRegionMapper(EurekaClientConfig clientConfig) {
         super(clientConfig);
     }
-
+    //得到region对应的所有zone
     @Override
     protected Set<String> getZonesForARegion(String region) {
         return new HashSet<String>(Arrays.asList(clientConfig.getAvailabilityZones(region)));

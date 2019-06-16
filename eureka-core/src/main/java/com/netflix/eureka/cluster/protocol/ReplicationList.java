@@ -11,6 +11,7 @@ import com.netflix.discovery.provider.Serializer;
 /**
  * @author Tomasz Bak
  */
+//批量提交同步操作任务的请求对象
 @Serializer("jackson") // For backwards compatibility with DiscoveryJerseyProvider
 public class ReplicationList {
     private final List<ReplicationInstance> replicationList;

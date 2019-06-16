@@ -1,7 +1,11 @@
 package com.netflix.discovery.converters;
 
 import com.netflix.discovery.util.StringCache;
+import org.apache.commons.lang.math.RandomUtils;
 import org.junit.Test;
+
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.junit.Assert.assertTrue;
 

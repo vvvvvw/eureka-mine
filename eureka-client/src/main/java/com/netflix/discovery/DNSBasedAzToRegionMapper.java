@@ -11,6 +11,7 @@ import java.util.Set;
  * DNS-based region mapper that discovers regions via DNS TXT records.
  * @author Nitesh Kant
  */
+//通过DNS 中的txt记录来发现dns region的映射情况
 public class DNSBasedAzToRegionMapper extends AbstractAzToRegionMapper {
 
     public DNSBasedAzToRegionMapper(EurekaClientConfig clientConfig) {

@@ -54,7 +54,7 @@ import static com.netflix.discovery.PropertyBasedClientConfigConstants.*;
  * </p>
  *
  * @author Karthik Ranganathan
- *
+ * 客户端连接配置
  */
 @Singleton
 @ProvidedBy(DefaultEurekaClientConfigProvider.class)
@@ -67,8 +67,11 @@ public class DefaultEurekaClientConfig implements EurekaClientConfig {
     public static final String DEFAULT_NAMESPACE = CommonConstants.DEFAULT_CONFIG_NAMESPACE + ".";
     public static final String DEFAULT_ZONE = "defaultZone";
 
+    //命名空间
     private final String namespace;
+    //配置文件对象
     private final DynamicPropertyFactory configInstance;
+    //HTTP 传输配置
     private final EurekaTransportConfig transportConfig;
 
     public DefaultEurekaClientConfig() {
@@ -80,7 +83,9 @@ public class DefaultEurekaClientConfig implements EurekaClientConfig {
                 ? namespace
                 : namespace + ".";
 
+        // 初始化 配置文件对象
         this.configInstance = Archaius1Utils.initConfig(CommonConstants.CONFIG_FILE_NAME);
+        // 创建 HTTP 传输配置
         this.transportConfig = new DefaultEurekaTransportConfig(namespace, configInstance);
     }
 
@@ -377,6 +382,8 @@ public class DefaultEurekaClientConfig implements EurekaClientConfig {
      * @see
      * com.netflix.discovery.EurekaClientConfig#getEurekaServerServiceUrls()
      */
+    //获取myZone对应的serviceUrl列表
+    //如果列表为空，则使用 default zone对应的serviceUrl列表
     @Override
     public List<String> getEurekaServerServiceUrls(String myZone) {
         String serviceUrls = configInstance.getStringProperty(

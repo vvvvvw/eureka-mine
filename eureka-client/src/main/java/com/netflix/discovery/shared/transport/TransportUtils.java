@@ -26,12 +26,19 @@ public final class TransportUtils {
     private TransportUtils() {
     }
 
+    //todo 本方法有bug
+    /*
+    目前该方法存在 BUG ，失败的线程直接返回 existing 的是 null ，需要修改成 return eurekaHttpClientRef.get()
+     */
     public static EurekaHttpClient getOrSetAnotherClient(AtomicReference<EurekaHttpClient> eurekaHttpClientRef, EurekaHttpClient another) {
         EurekaHttpClient existing = eurekaHttpClientRef.get();
+        // todo 这边设置的比较好 为空才设置
         if (eurekaHttpClientRef.compareAndSet(null, another)) {
             return another;
         }
+        // 设置失败，意味着另外一个线程已经设置
         another.shutdown();
+        //todo 此处有并发问题，应该改成eurekaHttpClientRef.get()
         return existing;
     }
 

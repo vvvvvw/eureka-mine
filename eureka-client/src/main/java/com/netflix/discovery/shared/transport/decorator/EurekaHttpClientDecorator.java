@@ -26,8 +26,10 @@ import com.netflix.discovery.shared.transport.EurekaHttpResponse;
 /**
  * @author Tomasz Bak
  */
+//EurekaHttpClient 委托者抽象类
 public abstract class EurekaHttpClientDecorator implements EurekaHttpClient {
 
+    //请求类型枚举类
     public enum RequestType {
         Register,
         Cancel,
@@ -43,22 +45,41 @@ public abstract class EurekaHttpClientDecorator implements EurekaHttpClient {
         GetApplicationInstance
     }
 
+    //请求执行器接口
     public interface RequestExecutor<R> {
+        /**
+         * 执行请求
+         *
+         * @param delegate 委托的 EurekaHttpClient
+         * @return 响应
+         */
         EurekaHttpResponse<R> execute(EurekaHttpClient delegate);
-
+        /**
+         * @return 请求类型
+         */
         RequestType getRequestType();
     }
 
+    /**
+     * 执行请求
+     *
+     * @param requestExecutor 请求执行器
+     * @param <R> 请求泛型
+     * @return 响应
+     */
+    //抽象方法，子类实现该方法，实现自己的特性
     protected abstract <R> EurekaHttpResponse<R> execute(RequestExecutor<R> requestExecutor);
 
+    //实现向 Eureka-Server 注册应用实例
     @Override
     public EurekaHttpResponse<Void> register(final InstanceInfo info) {
+        //并将原有的注册实现通过 RequestExecutor 传递进去
+        //子类在实现的 #execute(...) 方法，可以调用 RequestExecutor#execute(...) 方法，继续执行原有逻辑
         return execute(new RequestExecutor<Void>() {
             @Override
             public EurekaHttpResponse<Void> execute(EurekaHttpClient delegate) {
                 return delegate.register(info);
             }
-
             @Override
             public RequestType getRequestType() {
                 return RequestType.Register;

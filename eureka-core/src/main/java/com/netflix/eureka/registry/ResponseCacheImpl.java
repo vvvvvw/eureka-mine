@@ -73,6 +73,13 @@ import org.slf4j.LoggerFactory;
  *
  * @author Karthik Ranganathan, Greg Kim
  */
+/*
+负责缓存由客户端查询的注册表信息的类。
+对于三类请求 - 所有应用程序，增量更改和单个应用程序，缓存都以压缩和非压缩形式进行维护。
+在网络流量方面，压缩格式可能是最有效的，特别是在查询所有应用程序时。
+缓存还为JSON或者XML格式以及多个版本也保留了单独的负载。
+ */
+//响应缓存实现类
 public class ResponseCacheImpl implements ResponseCache {
 
     private static final Logger logger = LoggerFactory.getLogger(ResponseCacheImpl.class);
@@ -128,7 +135,9 @@ public class ResponseCacheImpl implements ResponseCache {
 
         long responseCacheUpdateIntervalMs = serverConfig.getResponseCacheUpdateIntervalMs();
         this.readWriteCacheMap =
+                //最大缓存数量为 1000
                 CacheBuilder.newBuilder().initialCapacity(1000)
+                        //读写缓存( readWriteCacheMap ) 写入后，一段时间自动过期设置写入过期时长。默认值 ：180 秒
                         .expireAfterWrite(serverConfig.getResponseCacheAutoExpirationInSeconds(), TimeUnit.SECONDS)
                         .removalListener(new RemovalListener<Key, Value>() {
                             @Override
@@ -147,12 +156,16 @@ public class ResponseCacheImpl implements ResponseCache {
                                     Key cloneWithNoRegions = key.cloneWithoutRegions();
                                     regionSpecificKeys.put(cloneWithNoRegions, key);
                                 }
+                                //生成缓存值
                                 Value value = generatePayload(key);
                                 return value;
                             }
                         });
 
         if (shouldUseReadOnlyResponseCache) {
+            //定时任务对比 readWriteCacheMap 和 readOnlyCacheMap 的缓存值，若不一致，以前者为主。
+            // 通过这样的方式，实现了 readOnlyCacheMap 的定时过期。
+            //初始化定时任务。配置 eureka.responseCacheUpdateIntervalMs，设置任务执行频率，默认值 ：30 * 1000 毫秒
             timer.schedule(getCacheUpdateTask(),
                     new Date(((System.currentTimeMillis() / responseCacheUpdateIntervalMs) * responseCacheUpdateIntervalMs)
                             + responseCacheUpdateIntervalMs),
@@ -170,17 +183,24 @@ public class ResponseCacheImpl implements ResponseCache {
         return new TimerTask() {
             @Override
             public void run() {
+                //创建定时任务。
                 logger.debug("Updating the client cache from response cache");
-                for (Key key : readOnlyCacheMap.keySet()) {
+                //todo 循环 readOnlyCacheMap 的缓存键。为什么不循环 readWriteCacheMap 呢？readOnlyCacheMap 的缓存过期依赖 readWriteCacheMap，因此缓存键会更多。
+                //我的解释是：因为要过期的是readOnlyCacheMap 的缓存键
+                for (Key key : readOnlyCacheMap.keySet()) { // 循环 readOnlyCacheMap 的缓存键
                     if (logger.isDebugEnabled()) {
                         Object[] args = {key.getEntityType(), key.getName(), key.getVersion(), key.getType()};
                         logger.debug("Updating the client cache from response cache for key : {} {} {} {}", args);
                     }
                     try {
+                        /*
+                        对比 readWriteCacheMap 和 readOnlyCacheMap 的缓存值，若不一致，
+                        以前者为主。通过这样的方式，实现了 readOnlyCacheMap 的定时过期。
+                         */
                         CurrentRequestVersion.set(key.getVersion());
                         Value cacheValue = readWriteCacheMap.get(key);
                         Value currentCacheValue = readOnlyCacheMap.get(key);
-                        if (cacheValue != currentCacheValue) {
+                        if (cacheValue != currentCacheValue) {  // 不一致时，进行替换
                             readOnlyCacheMap.put(key, cacheValue);
                         }
                     } catch (Throwable th) {
@@ -203,10 +223,18 @@ public class ResponseCacheImpl implements ResponseCache {
      * @param key the key for which the cached information needs to be obtained.
      * @return payload which contains information about the applications.
      */
+    /*
+    读取缓存。其中 shouldUseReadOnlyResponseCache 通过配置 eureka.shouldUseReadOnlyResponseCache = true (默认值 ：true ) 开启只读缓存。如果你对数据的一致性有相对高的要求，
+    可以关闭这个开关，当然因为少了 readOnlyCacheMap ，性能会有一定的下降。
+     */
     public String get(final Key key) {
         return get(key, shouldUseReadOnlyResponseCache);
     }
 
+    /*
+    读取缓存。从 readOnlyCacheMap 和 readWriteCacheMap 变量可以看到缓存值的类为
+    com.netflix.eureka.registry.ResponseCacheImpl.Value
+     */
     @VisibleForTesting
     String get(final Key key, boolean useReadOnlyCache) {
         Value payload = getValue(key, useReadOnlyCache);
@@ -239,10 +267,12 @@ public class ResponseCacheImpl implements ResponseCache {
      *
      * @param appName the application name of the application.
      */
+    //主动过期读写缓存
     @Override
     public void invalidate(String appName, @Nullable String vipAddress, @Nullable String secureVipAddress) {
         for (Key.KeyType type : Key.KeyType.values()) {
             for (Version v : Version.values()) {
+                //逐个过期每个缓存键值
                 invalidate(
                         new Key(Key.EntityType.Application, appName, type, v, EurekaAccept.full),
                         new Key(Key.EntityType.Application, appName, type, v, EurekaAccept.compact),
@@ -270,8 +300,9 @@ public class ResponseCacheImpl implements ResponseCache {
         for (Key key : keys) {
             logger.debug("Invalidating the response cache key : {} {} {} {}, {}",
                     key.getEntityType(), key.getName(), key.getVersion(), key.getType(), key.getEurekaAccept());
-
+            // 过期读写缓存
             readWriteCacheMap.invalidate(key);
+            //todo ?
             Collection<Key> keysWithRegions = regionSpecificKeys.get(key);
             if (null != keysWithRegions && !keysWithRegions.isEmpty()) {
                 for (Key keysWithRegion : keysWithRegions) {
@@ -344,6 +375,7 @@ public class ResponseCacheImpl implements ResponseCache {
     Value getValue(final Key key, boolean useReadOnlyCache) {
         Value payload = null;
         try {
+            //先读取 readOnlyCacheMap 。读取不到，读取 readWriteCacheMap ，并设置到 readOnlyCacheMap
             if (useReadOnlyCache) {
                 final Value currentPayload = readOnlyCacheMap.get(key);
                 if (currentPayload != null) {
@@ -365,9 +397,11 @@ public class ResponseCacheImpl implements ResponseCache {
      * Generate pay load with both JSON and XML formats for all applications.
      */
     private String getPayLoad(Key key, Applications apps) {
+        // 获得编码器
         EncoderWrapper encoderWrapper = serverCodecs.getEncoder(key.getType(), key.getEurekaAccept());
         String result;
         try {
+            // 编码
             result = encoderWrapper.encode(apps);
         } catch (Exception e) {
             logger.error("Failed to encode the payload for all apps", e);
@@ -406,15 +440,17 @@ public class ResponseCacheImpl implements ResponseCache {
             switch (key.getEntityType()) {
                 case Application:
                     boolean isRemoteRegionRequested = key.hasRegions();
-
+                    //获得注册的应用集合。后调用 #getPayLoad() 方法，将注册的应用集合转换成缓存值。
                     if (ALL_APPS.equals(key.getName())) {
                         if (isRemoteRegionRequested) {
                             tracer = serializeAllAppsWithRemoteRegionTimer.start();
                             payload = getPayLoad(key, registry.getApplicationsFromMultipleRegions(key.getRegions()));
                         } else {
                             tracer = serializeAllAppsTimer.start();
+                            //获得注册的应用集合
                             payload = getPayLoad(key, registry.getApplications());
                         }
+                        //获取增量注册信息的缓存值
                     } else if (ALL_APPS_DELTA.equals(key.getName())) {
                         if (isRemoteRegionRequested) {
                             tracer = serializeDeltaAppsWithRemoteRegionTimer.start();
@@ -498,7 +534,9 @@ public class ResponseCacheImpl implements ResponseCache {
      *
      */
     public class Value {
+        //原始值
         private final String payload;
+        //GZIP 压缩后的值
         private byte[] gzipped;
 
         public Value(String payload) {
@@ -506,6 +544,7 @@ public class ResponseCacheImpl implements ResponseCache {
             if (!EMPTY_PAYLOAD.equals(payload)) {
                 Stopwatch tracer = compressPayloadTimer.start();
                 try {
+                    //GZIP 压缩
                     ByteArrayOutputStream bos = new ByteArrayOutputStream();
                     GZIPOutputStream out = new GZIPOutputStream(bos);
                     byte[] rawBytes = payload.getBytes();

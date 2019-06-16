@@ -13,14 +13,17 @@ import java.util.List;
 import java.util.Map;
 
 /**
+ * 应用实例注册表接口。它继承了 LookupService 、LeaseManager 接口，提供应用实例的注册与发现服务。另外，它结合实际业务场景，定义了更加丰富的接口方法。
  * @author Tomasz Bak
  */
 public interface InstanceRegistry extends LeaseManager<InstanceInfo>, LookupService<String> {
 
+    // ====== 开启与关闭相关 ======
     void openForTraffic(ApplicationInfoManager applicationInfoManager, int count);
 
     void shutdown();
 
+    // ====== 应用实例状态变更相关 ======
     @Deprecated
     void storeOverriddenStatusIfRequired(String id, InstanceStatus overriddenStatus);
 
@@ -28,6 +31,7 @@ public interface InstanceRegistry extends LeaseManager<InstanceInfo>, LookupServ
 
     boolean statusUpdate(String appName, String id, InstanceStatus newStatus,
                          String lastDirtyTimestamp, boolean isReplication);
+
 
     boolean deleteStatusOverride(String appName, String id, InstanceStatus newStatus,
                                  String lastDirtyTimestamp, boolean isReplication);
@@ -72,19 +76,17 @@ public interface InstanceRegistry extends LeaseManager<InstanceInfo>, LookupServ
 
     void clearRegistry();
 
+    // ====== 响应缓存相关 ======
     void initializedResponseCache();
 
     ResponseCache getResponseCache();
 
+    // ====== 自我保护模式相关 ======
     long getNumOfRenewsInLastMin();
 
     int getNumOfRenewsPerMinThreshold();
 
     int isBelowRenewThresold();
-
-    List<Pair<Long, String>> getLastNRegisteredInstances();
-
-    List<Pair<Long, String>> getLastNCanceledInstances();
 
     /**
      * Checks whether lease expiration is enabled.
@@ -93,5 +95,10 @@ public interface InstanceRegistry extends LeaseManager<InstanceInfo>, LookupServ
     boolean isLeaseExpirationEnabled();
 
     boolean isSelfPreservationModeEnabled();
+
+    // ====== 调试/监控相关 ======
+    List<Pair<Long, String>> getLastNRegisteredInstances();
+
+    List<Pair<Long, String>> getLastNCanceledInstances();
 
 }

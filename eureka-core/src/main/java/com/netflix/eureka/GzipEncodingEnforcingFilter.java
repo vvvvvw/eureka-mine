@@ -52,6 +52,7 @@ public class GzipEncodingEnforcingFilter implements Filter {
     public void destroy() {
     }
 
+    //包装request，使得获取请求ACCEPT_ENCODING时，返回gzip
     private static HttpServletRequest addGzipAcceptEncoding(HttpServletRequest request) {
         return new HttpServletRequestWrapper(request) {
 
@@ -97,6 +98,7 @@ public class GzipEncodingEnforcingFilter implements Filter {
             return extraElementRef.get() != null || delegate != null && delegate.hasMoreElements();
         }
 
+        //先获取extraElementRef中的元素；如果为null，则调用delegate.nextElement()
         @Override
         public E nextElement() {
             E extra = extraElementRef.getAndSet(null);

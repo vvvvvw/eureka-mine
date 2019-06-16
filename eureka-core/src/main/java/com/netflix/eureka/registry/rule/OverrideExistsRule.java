@@ -9,13 +9,14 @@ import java.util.Map;
 
 /**
  * This rule checks to see if we have overrides for an instance and if we do then we return those.
- *
+ * 本类
  * Created by Nikos Michalakis on 7/13/16.
  */
+//匹配应用实例覆盖状态映射( statusOverrides )
 public class OverrideExistsRule implements InstanceStatusOverrideRule {
 
     private static final Logger logger = LoggerFactory.getLogger(OverrideExistsRule.class);
-
+    //应用实例覆盖状态映射.在 PeerAwareInstanceRegistryImpl 里，使用 AbstractInstanceRegistry.overriddenInstanceStatusMap 属性赋值。
     private Map<String, InstanceInfo.InstanceStatus> statusOverrides;
 
     public OverrideExistsRule(Map<String, InstanceInfo.InstanceStatus> statusOverrides) {
@@ -25,6 +26,7 @@ public class OverrideExistsRule implements InstanceStatusOverrideRule {
     @Override
     public StatusOverrideResult apply(InstanceInfo instanceInfo, Lease<InstanceInfo> existingLease, boolean isReplication) {
         InstanceInfo.InstanceStatus overridden = statusOverrides.get(instanceInfo.getId());
+        //当存在覆盖状态( statusoverrides ) ，使用该状态
         // If there are instance specific overrides, then they win - otherwise the ASG status
         if (overridden != null) {
             logger.debug("The instance specific override for instance {} and the value is {}",

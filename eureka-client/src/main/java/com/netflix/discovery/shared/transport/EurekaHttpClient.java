@@ -7,9 +7,11 @@ import com.netflix.discovery.shared.Applications;
 
 /**
  * Low level Eureka HTTP client API.
- *
+ * eureka http客户端api
  * @author Tomasz Bak
  */
+//Eureka-Server HTTP 访问客户端，定义了具体的 Eureka-Server API 调用方法。
+// 如果把 DiscoveryClient 类比成 Service ，那么 EurekaHttpClient 可以类比成 Dao
 public interface EurekaHttpClient {
 
     EurekaHttpResponse<Void> register(InstanceInfo info);

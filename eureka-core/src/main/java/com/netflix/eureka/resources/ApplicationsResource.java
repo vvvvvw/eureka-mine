@@ -51,6 +51,7 @@ import com.netflix.eureka.util.EurekaMonitors;
  * @author Karthik Ranganathan, Greg Kim
  *
  */
+//处理所有应用的请求操作的 Resource ( Controller )
 @Path("/{version}/apps")
 @Produces({"application/xml", "application/json"})
 public class ApplicationsResource {
@@ -109,6 +110,7 @@ public class ApplicationsResource {
      * @return a response containing information about all {@link com.netflix.discovery.shared.Applications}
      *         from the {@link AbstractInstanceRegistry}.
      */
+    //得到所有的注册信息
     @GET
     public Response getContainers(@PathParam("version") String version,
                                   @HeaderParam(HEADER_ACCEPT) String acceptHeader,
@@ -116,7 +118,6 @@ public class ApplicationsResource {
                                   @HeaderParam(EurekaAccept.HTTP_X_EUREKA_ACCEPT) String eurekaAccept,
                                   @Context UriInfo uriInfo,
                                   @Nullable @QueryParam("regions") String regionsStr) {
-
         boolean isRemoteRegionRequested = null != regionsStr && !regionsStr.isEmpty();
         String[] regions = null;
         if (!isRemoteRegionRequested) {
@@ -130,23 +131,33 @@ public class ApplicationsResource {
         // Check if the server allows the access to the registry. The server can
         // restrict access if it is not
         // ready to serve traffic depending on various reasons.
+        // 判断是否可以访问
+        /*
+        Eureka-Server 启动完成，但是未处于就绪( Ready )状态，不接受请求全量应用注册信息的请求，
+        例如，Eureka-Server 启动时，未能从其他 Eureka-Server 集群的节点获取到应用注册信息。
+         */
         if (!registry.shouldAllowAccess(isRemoteRegionRequested)) {
             return Response.status(Status.FORBIDDEN).build();
         }
+        // 设置 API 版本号。默认最新 API 版本为 V2。
         CurrentRequestVersion.set(Version.toEnum(version));
+        // 返回数据格式
+        //设置返回数据格式，默认 JSON
         KeyType keyType = Key.KeyType.JSON;
         String returnMediaType = MediaType.APPLICATION_JSON;
         if (acceptHeader == null || !acceptHeader.contains(HEADER_JSON_VALUE)) {
             keyType = Key.KeyType.XML;
             returnMediaType = MediaType.APPLICATION_XML;
         }
-
+        // 响应缓存键( KEY )
+        //创建响应缓存( ResponseCache ) 的键( KEY )
         Key cacheKey = new Key(Key.EntityType.Application,
                 ResponseCacheImpl.ALL_APPS,
                 keyType, CurrentRequestVersion.get(), EurekaAccept.fromString(eurekaAccept), regions
         );
 
         Response response;
+        //从响应缓存读取全量注册信息
         if (acceptEncoding != null && acceptEncoding.contains(HEADER_GZIP_VALUE)) {
             response = Response.ok(responseCache.getGZIP(cacheKey))
                     .header(HEADER_CONTENT_ENCODING, HEADER_GZIP_VALUE)

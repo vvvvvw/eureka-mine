@@ -10,16 +10,19 @@ public interface EurekaTransportConfig {
     /**
      * @return the reconnect inverval to use for sessioned clients
      */
+    //会话客户端的重连间隔
     int getSessionedClientReconnectIntervalSeconds();
 
     /**
      * @return the percentage of the full endpoints set above which the quarantine set is cleared in the range [0, 1.0]
      */
+    //如果隔离endpoint集合占所有候选endpoint的比率在该百分比以上，则清除隔离endpoint集合
     double getRetryableClientQuarantineRefreshPercentage();
 
     /**
      * @return the max staleness threshold tolerated by the applications resolver
      */
+    //todo 不懂
     int getApplicationsResolverDataStalenessThresholdSeconds();
 
     /**
@@ -28,21 +31,26 @@ public interface EurekaTransportConfig {
      *
      * @return false by default
      */
+    //应用默认提取内部实例主机的ip地址作为主机名，默认设置为false，则提取ip地址；
+    //影响到的地方有：1.server端replicate本机地址到其他server上时，摘除掉本机
     boolean applicationsResolverUseIp();
 
     /**
      * @return the interval to poll for the async resolver.
      */
+    //todo 不懂
     int getAsyncResolverRefreshIntervalMs();
 
     /**
      * @return the async refresh timeout threshold in ms.
      */
+    //todo 不懂
     int getAsyncResolverWarmUpTimeoutMs();
 
     /**
      * @return the max threadpool size for the async resolver's executor
      */
+    //todo 不懂
     int getAsyncExecutorThreadPoolSize();
 
     /**
@@ -50,6 +58,7 @@ public interface EurekaTransportConfig {
      *
      * @return the vipAddress for the write cluster to register with
      */
+    //todo 这不应该是2.0的么？
     String getWriteClusterVip();
 
     /**
@@ -58,6 +67,7 @@ public interface EurekaTransportConfig {
      *
      * @return the vipAddress for the readonly cluster to redirect to, if applicable (can be the same as the bootstrap)
      */
+    //todo 这不应该是2.0的么？
     String getReadClusterVip();
 
     /**
@@ -69,6 +79,7 @@ public interface EurekaTransportConfig {
      *
      * @return null for the default strategy, by default
      */
+    //用来指定Endpoint解析器，如果没有指定，则使用默认的ZoneAffinityClusterResolver，ZoneAffinityClusterResolver使用AsyncResolver作为代理
     String getBootstrapResolverStrategy();
 
     /**
@@ -80,5 +91,6 @@ public interface EurekaTransportConfig {
      *
      * @return true by default.
      */
+    //todo 不懂
     boolean useBootstrapResolverForQuery();
 }

@@ -33,7 +33,9 @@ public abstract class AbstractJerseyEurekaHttpClient implements EurekaHttpClient
 
     private static final Logger logger = LoggerFactory.getLogger(AbstractJerseyEurekaHttpClient.class);
 
+    //Jersey Client ，使用上文的 EurekaHttpClient#getClient(...) 方法，获取 ApacheHttpClient4
     protected final Client jerseyClient;
+    //请求的 Eureka-Server 地址
     protected final String serviceUrl;
 
     protected AbstractJerseyEurekaHttpClient(Client jerseyClient, String serviceUrl) {
@@ -42,18 +44,23 @@ public abstract class AbstractJerseyEurekaHttpClient implements EurekaHttpClient
         logger.debug("Created client for url: {}", serviceUrl);
     }
 
+    //实现向 Eureka-Server 注册应用实例
     @Override
     public EurekaHttpResponse<Void> register(InstanceInfo info) {
+        // 设置 请求地址
         String urlPath = "apps/" + info.getAppName();
         ClientResponse response = null;
         try {
             Builder resourceBuilder = jerseyClient.resource(serviceUrl).path(urlPath).getRequestBuilder();
+            // 设置 请求头
             addExtraHeaders(resourceBuilder);
+            // 请求 Eureka-Server
             response = resourceBuilder
-                    .header("Accept-Encoding", "gzip")
-                    .type(MediaType.APPLICATION_JSON_TYPE)
-                    .accept(MediaType.APPLICATION_JSON)
-                    .post(ClientResponse.class, info);
+                    .header("Accept-Encoding", "gzip") // GZIP
+                    .type(MediaType.APPLICATION_JSON_TYPE) // 请求参数格式 JSON
+                    .accept(MediaType.APPLICATION_JSON) // 响应结果格式 JSON
+                    .post(ClientResponse.class, info); // 请求参数
+            // 创建 EurekaHttpResponse
             return anEurekaHttpResponse(response.getStatus()).headers(headersOf(response)).build();
         } finally {
             if (logger.isDebugEnabled()) {
@@ -66,6 +73,10 @@ public abstract class AbstractJerseyEurekaHttpClient implements EurekaHttpClient
         }
     }
 
+    /*
+    调用 AbstractJerseyEurekaHttpClient#cancel(...) 方法，DELETE 请求 Eureka-Server
+    的 apps/${APP_NAME}/${INSTANCE_INFO_ID} 接口，实现应用实例信息的下线
+     */
     @Override
     public EurekaHttpResponse<Void> cancel(String appName, String id) {
         String urlPath = "apps/" + appName + '/' + id;
@@ -87,6 +98,7 @@ public abstract class AbstractJerseyEurekaHttpClient implements EurekaHttpClient
 
     @Override
     public EurekaHttpResponse<InstanceInfo> sendHeartBeat(String appName, String id, InstanceInfo info, InstanceStatus overriddenStatus) {
+        //发起续租请求
         String urlPath = "apps/" + appName + '/' + id;
         ClientResponse response = null;
         try {
@@ -160,11 +172,15 @@ public abstract class AbstractJerseyEurekaHttpClient implements EurekaHttpClient
         }
     }
 
+    /*
+    GET 请求 Eureka-Server 的 apps/ 接口，参数为 regions ，返回格式为 JSON ，实现全量获取注册信息
+     */
     @Override
     public EurekaHttpResponse<Applications> getApplications(String... regions) {
         return getApplicationsInternal("apps/", regions);
     }
 
+    //GET 请求 Eureka-Server 的 apps/detla 接口，参数为 regions ，返回格式为 JSON ，实现增量获取注册信息
     @Override
     public EurekaHttpResponse<Applications> getDelta(String... regions) {
         return getApplicationsInternal("apps/delta", regions);
@@ -179,7 +195,9 @@ public abstract class AbstractJerseyEurekaHttpClient implements EurekaHttpClient
     public EurekaHttpResponse<Applications> getSecureVip(String secureVipAddress, String... regions) {
         return getApplicationsInternal("svips/" + secureVipAddress, regions);
     }
-
+    /*
+    GET 请求 Eureka-Server 的 apps/ 接口，参数为 regions ，返回格式为 JSON ，实现全量获取注册信息
+     */
     private EurekaHttpResponse<Applications> getApplicationsInternal(String urlPath, String[] regions) {
         ClientResponse response = null;
         String regionsParamValue = null;
@@ -282,6 +300,7 @@ public abstract class AbstractJerseyEurekaHttpClient implements EurekaHttpClient
         // Do not destroy jerseyClient, as it is owned by the corresponding EurekaHttpClientFactory
     }
 
+    //调用 #addExtraHeaders(...) 方法，设置请求头( header )。该方法是抽象方法，提供子类实现自定义的请求头。
     protected abstract void addExtraHeaders(Builder webResource);
 
     private static Map<String, String> headersOf(ClientResponse response) {

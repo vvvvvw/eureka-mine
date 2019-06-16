@@ -43,7 +43,8 @@ import org.slf4j.LoggerFactory;
  * <p>
  *
  * @author Karthik Ranganathan, Greg Kim
- *
+ * 代表了一个peer节点，该节点上的信息应该从本节点上共享出去
+ * 本类处理所有更新操作，比如Register,Renew,Cancel,Expiration and Status Changes到本节点所代表的节点上
  */
 public class PeerEurekaNode {
 
@@ -73,14 +74,25 @@ public class PeerEurekaNode {
 
     public static final String HEADER_REPLICATION = "x-netflix-discovery-replication";
 
+    //服务地址
     private final String serviceUrl;
+    //Eureka-Server 配置
     private final EurekaServerConfig config;
+    //批任务同步最大延迟
     private final long maxProcessingDelayMs;
+    //应用实例注册表
     private final PeerAwareInstanceRegistry registry;
+    /**
+     * 目标 host
+     * {@link #serviceUrl} 中解析
+     */
     private final String targetHost;
+    //集群  EurekaHttpClient
     private final HttpReplicationClient replicationClient;
 
+    //批量任务分发器
     private final TaskDispatcher<String, ReplicationTask> batchingDispatcher;
+    //单任务分发器
     private final TaskDispatcher<String, ReplicationTask> nonBatchingDispatcher;
 
     public PeerEurekaNode(PeerAwareInstanceRegistry registry, String targetHost, String serviceUrl, HttpReplicationClient replicationClient, EurekaServerConfig config) {
@@ -100,17 +112,23 @@ public class PeerEurekaNode {
         this.maxProcessingDelayMs = config.getMaxTimeForReplication();
 
         String batcherName = getBatcherName();
+        // 初始化 集群复制任务处理器
         ReplicationTaskProcessor taskProcessor = new ReplicationTaskProcessor(targetHost, replicationClient);
+        // 初始化 批量任务分发器
         this.batchingDispatcher = TaskDispatchers.createBatchingTaskDispatcher(
                 batcherName,
                 config.getMaxElementsInPeerReplicationPool(),
                 batchSize,
                 config.getMaxThreadsForPeerReplication(),
                 maxBatchingDelayMs,
+                //拥塞重试时间
                 serverUnavailableSleepTimeMs,
+                //网络故障重试时间
                 retrySleepTimeMs,
                 taskProcessor
         );
+        // 初始化 单任务分发器
+        // 创建单任务分发器，用于 Eureka-Server 向亚马逊 AWS 的 ASG ( Autoscaling Group ) 同步状态
         this.nonBatchingDispatcher = TaskDispatchers.createNonBatchingTaskDispatcher(
                 targetHost,
                 config.getMaxElementsInStatusReplicationPool(),
@@ -157,6 +175,13 @@ public class PeerEurekaNode {
     public void cancel(final String appName, final String id) throws Exception {
         long expiryTime = System.currentTimeMillis() + maxProcessingDelayMs;
         batchingDispatcher.process(
+                /*
+                我们看到” 接收线程( Runner )合并任务，将相同任务编号的任务合并，只执行一次。 “，因此，
+                相同应用实例的相同同步操作就能被合并，减少操作量。例如，Eureka-Server 同步某个应用实例的
+                Heartbeat 操作，接收同步的 Eureak-Server 挂了，一方面这个应用的这次操作会重试，另一方面，
+                这个应用实例会发起新的 Heartbeat 操作，通过任务编号合并，接收同步的 Eureka-Server 恢复后，
+                减少收到重复积压的任务。
+                 */
                 taskId("cancel", appName, id),
                 new InstanceReplicationTask(targetHost, Action.Cancel, appName, id) {
                     @Override
@@ -164,6 +189,7 @@ public class PeerEurekaNode {
                         return replicationClient.cancel(appName, id);
                     }
 
+                    //当 Eureka-Server 不存在下线的应用实例时，返回 404 状态码，此时打印错误日志
                     @Override
                     public void handleFailure(int statusCode, Object responseEntity) throws Throwable {
                         super.handleFailure(statusCode, responseEntity);
@@ -171,7 +197,8 @@ public class PeerEurekaNode {
                             logger.warn("{}: missing entry.", getTaskName());
                         }
                     }
-                },
+                },// ReplicationTask 子类
+                //任务过期时间
                 expiryTime
         );
     }
@@ -205,9 +232,28 @@ public class PeerEurekaNode {
                 return replicationClient.sendHeartBeat(appName, id, info, overriddenStatus);
             }
 
+            /*
+            Eureka-Server 是允许同一时刻允许在任意节点被 Eureka-Client 发起写入相关的操作，
+            网络是不可靠的资源，Eureka-Client 可能向一个 Eureka-Server 注册成功，但是网络波动，
+            导致 Eureka-Client 误以为失败，此时恰好 Eureka-Client 变更了应用实例的状态，重试向
+            另一个 Eureka-Server 注册，那么两个 Eureka-Server 对该应用实例的状态产生冲突。
+
+            但是光靠注册请求判断 lastDirtyTimestamp 显然是不够的，因为网络异常情况下时，
+            同步操作任务多次执行失败到达过期时间后，此时在 Eureka-Server 集群同步起到最终
+            一致性最最最关键性出现了：Heartbeat 。因为 Heartbeat 会周期性的执行，通过它
+            一方面可以判断 Eureka-Server 是否存在心跳对应的应用实例，另外一方面可以比较
+            应用实例的 lastDirtyTimestamp 。当满足下面任意条件，Eureka-Server 返回 404 状态码
+            1）Eureka-Server 应用实例不存在，点击 链接 查看触发条件代码位置。
+            2）Eureka-Server 应用实例状态为 UNKNOWN，点击 链接 查看触发条件代码位置。为什么会是 UNKNOWN ，在 《Eureka 源码解析 —— 应用实例注册发现（八）之覆盖状态》「 4.3 续租场景」 有详细解析。
+             请求方接收到 404 状态码返回后，认为 Eureka-Server 应用实例实际是不存在的，重新发起应用实例的注册
+             */
             @Override
             public void handleFailure(int statusCode, Object responseEntity) throws Throwable {
                 super.handleFailure(statusCode, responseEntity);
+                /*
+                  接收到 404 状态码，调用 #register(...) 方法，向该被心跳同步操作失败的 Eureka-Server 发起注册
+                  本地的应用实例的请求
+                  */
                 if (statusCode == 404) {
                     logger.warn("{}: missing entry.", getTaskName());
                     if (info != null) {
@@ -215,6 +261,10 @@ public class PeerEurekaNode {
                                 getTaskName(), info.getId(), info.getStatus());
                         register(info);
                     }
+                    /*
+                    本地的应用实例的 lastDirtyTimestamp 小于 Eureka-Server 该应用实例的，
+                    此时 Eureka-Server 返回 409 状态码
+                     */
                 } else if (config.shouldSyncWhenTimestampDiffers()) {
                     InstanceInfo peerInstanceInfo = (InstanceInfo) responseEntity;
                     if (peerInstanceInfo != null) {
@@ -361,10 +411,12 @@ public class PeerEurekaNode {
                 logger.warn("Peer wants us to take the instance information from it, since the timestamp differs,"
                         + "Id : {} My Timestamp : {}, Peer's timestamp: {}", id, info.getLastDirtyTimestamp(), infoFromPeer.getLastDirtyTimestamp());
 
+                // 存储应用实例的覆盖状态
                 if (infoFromPeer.getOverriddenStatus() != null && !InstanceStatus.UNKNOWN.equals(infoFromPeer.getOverriddenStatus())) {
                     logger.warn("Overridden Status info -id {}, mine {}, peer's {}", id, info.getOverriddenStatus(), infoFromPeer.getOverriddenStatus());
                     registry.storeOverriddenStatusIfRequired(appName, id, infoFromPeer.getOverriddenStatus());
                 }
+                // 向自身注册
                 registry.register(infoFromPeer, true);
             }
         } catch (Throwable e) {
@@ -382,6 +434,7 @@ public class PeerEurekaNode {
         return "target_" + batcherName;
     }
 
+    //生成同步操作任务编号
     private static String taskId(String requestType, String appName, String id) {
         return requestType + '#' + appName + '/' + id;
     }

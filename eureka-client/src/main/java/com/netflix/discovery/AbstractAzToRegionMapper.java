@@ -27,6 +27,7 @@ public abstract class AbstractAzToRegionMapper implements AzToRegionMapper {
 
     protected final EurekaClientConfig clientConfig;
 
+    //映射的默认值，如果远程区域被配置为被抓取但没有任何可用性区域映射，并且远程区域包含在defaultRegionVsAzMap中，我们将使用这些默认值。
     /**
      * A default for the mapping that we know of, if a remote region is configured to be fetched but does not have
      * any availability zone mapping, we will use these defaults. OTOH, if the remote region has any mapping defaults
@@ -39,15 +40,17 @@ public abstract class AbstractAzToRegionMapper implements AzToRegionMapper {
                     return new ArrayList<String>();
                 }
             });
-
+    //key:zone,value:region
     private final Map<String, String> availabilityZoneVsRegion = new ConcurrentHashMap<String, String>();
     private String[] regionsToFetch;
 
     protected AbstractAzToRegionMapper(EurekaClientConfig clientConfig) {
         this.clientConfig = clientConfig;
+        //设置默认映射
         populateDefaultAZToRegionMap();
     }
 
+    //根据regionsToFetch刷新availabilityZoneVsRegion
     @Override
     public synchronized void setRegionsToFetch(String[] regionsToFetch) {
         if (null != regionsToFetch) {
@@ -56,6 +59,8 @@ public abstract class AbstractAzToRegionMapper implements AzToRegionMapper {
             availabilityZoneVsRegion.clear();
             for (String remoteRegion : regionsToFetch) {
                 Set<String> availabilityZones = getZonesForARegion(remoteRegion);
+                //如果没有获取到availabilityZones或者获取到一个availabilityZones但是是DEFAULT_ZONE
+                //如果defaultRegionVsAzMap中包含对应region，则将defaultRegionVsAzMap中对应的条目存入availabilityZoneVsRegion
                 if (null == availabilityZones
                         || (availabilityZones.size() == 1 && availabilityZones.contains(DEFAULT_ZONE))
                         || availabilityZones.isEmpty()) {
@@ -93,6 +98,7 @@ public abstract class AbstractAzToRegionMapper implements AzToRegionMapper {
      * @param region the region whose zones you want
      * @return a set of zones
      */
+    //返回 Regions 中的所有zone
     protected abstract Set<String> getZonesForARegion(String region);
 
     @Override
@@ -113,9 +119,12 @@ public abstract class AbstractAzToRegionMapper implements AzToRegionMapper {
     /**
      * Tries to determine what region we're in, based on the provided availability zone.
      * @param availabilityZone the availability zone to inspect
+     * 尝试根据提供的可用区域，来返回对应的region：将传入参数的最后一个字符删除，如果截断后的字符串在
+     * availabilityZoneVsRegion保存的region中，返回对应的region；否则返回null对应于本地region
      * @return the region, if available; null otherwise
      */
     protected String parseAzToGetRegion(String availabilityZone) {
+        // 可能传入的可用区域 为<region><single letter>这种pattern，因此我们去除该字符
         // Here we see that whether the availability zone is following a pattern like <region><single letter>
         // If it is then we take ignore the last letter and check if the remaining part is actually a known remote
         // region. If yes, then we return that region, else null which means local region.

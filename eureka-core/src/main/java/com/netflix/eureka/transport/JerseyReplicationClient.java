@@ -35,6 +35,7 @@ import static com.netflix.discovery.shared.transport.EurekaHttpResponse.anEureka
 /**
  * @author Tomasz Bak
  */
+//Eureka-Server 集群内，Eureka-Server 请求 其它的Eureka-Server 的网络通信
 public class JerseyReplicationClient extends AbstractJerseyEurekaHttpClient implements HttpReplicationClient {
 
     private static final Logger logger = LoggerFactory.getLogger(JerseyReplicationClient.class);
@@ -48,6 +49,7 @@ public class JerseyReplicationClient extends AbstractJerseyEurekaHttpClient impl
         this.jerseyApacheClient = jerseyClient.getClient();
     }
 
+    //添加自定义头 x-netflix-discovery-replication=true
     @Override
     protected void addExtraHeaders(Builder webResource) {
         webResource.header(PeerEurekaNode.HEADER_REPLICATION, "true");
@@ -105,6 +107,7 @@ public class JerseyReplicationClient extends AbstractJerseyEurekaHttpClient impl
         }
     }
 
+    //请求 peerreplication/batch/ 接口，一次性将批量( 多个 )的同步操作任务发起请求
     @Override
     public EurekaHttpResponse<ReplicationListResponse> submitBatchUpdates(ReplicationList replicationList) {
         ClientResponse response = null;
@@ -132,6 +135,8 @@ public class JerseyReplicationClient extends AbstractJerseyEurekaHttpClient impl
         jerseyClient.destroyResources();
     }
 
+    //创建 JerseyReplicationClient
+    //创建用于 Eureka-Server 集群内，Eureka-Server 请求 其它的Eureka-Server 的网络通信客户端
     public static JerseyReplicationClient createReplicationClient(EurekaServerConfig config, ServerCodecs serverCodecs, String serviceUrl) {
         String name = JerseyReplicationClient.class.getSimpleName() + ": " + serviceUrl + "apps/: ";
 

@@ -41,10 +41,12 @@ import org.slf4j.LoggerFactory;
 /**
  * @author Tomasz Bak
  */
+//监控指标收集 EurekaHttpClient ，配合 Netflix Servo 实现监控信息采集
 public class MetricsCollectingEurekaHttpClient extends EurekaHttpClientDecorator {
 
     private static final Logger logger = LoggerFactory.getLogger(MetricsCollectingEurekaHttpClient.class);
 
+    //对应 JerseyApplicationClient
     private final EurekaHttpClient delegate;
 
     private final Map<RequestType, EurekaHttpClientRequestMetrics> metricsByRequestType;
@@ -67,10 +69,13 @@ public class MetricsCollectingEurekaHttpClient extends EurekaHttpClientDecorator
 
     @Override
     protected <R> EurekaHttpResponse<R> execute(RequestExecutor<R> requestExecutor) {
+        // 获得 请求类型 的 请求指标
         EurekaHttpClientRequestMetrics requestMetrics = metricsByRequestType.get(requestExecutor.getRequestType());
         Stopwatch stopwatch = requestMetrics.latencyTimer.start();
         try {
+            // 调用 RequestExecutor#execute(...) 方法，继续执行请求。
             EurekaHttpResponse<R> httpResponse = requestExecutor.execute(delegate);
+            // 增加 请求指标
             requestMetrics.countersByStatus.get(mappedStatus(httpResponse)).increment();
             return httpResponse;
         } catch (Exception e) {

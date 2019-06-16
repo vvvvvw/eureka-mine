@@ -12,17 +12,20 @@ import org.slf4j.LoggerFactory;
 /**
  * @author Nitesh Kant
  */
+//应用实例信息区域( region )校验
 public class InstanceRegionChecker {
     private static Logger logger = LoggerFactory.getLogger(InstanceRegionChecker.class);
 
     private final AzToRegionMapper azToRegionMapper;
-    private final String localRegion;
+    //本地区域( Region )
+    private final String  localRegion;
 
     InstanceRegionChecker(AzToRegionMapper azToRegionMapper, String localRegion) {
         this.azToRegionMapper = azToRegionMapper;
         this.localRegion = localRegion;
     }
 
+    //根据instanceInfo得到region名
     @Nullable
     public String getInstanceRegion(InstanceInfo instanceInfo) {
         if (instanceInfo.getDataCenterInfo() == null || instanceInfo.getDataCenterInfo().getName() == null) {
@@ -42,7 +45,7 @@ public class InstanceRegionChecker {
 
         return null;
     }
-
+    //instanceRegion为null或者等于instanceRegion，则返回true
     public boolean isLocalRegion(@Nullable String instanceRegion) {
         return null == instanceRegion || instanceRegion.equals(localRegion); // no region == local
     }

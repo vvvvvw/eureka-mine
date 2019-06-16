@@ -40,21 +40,26 @@ public class EurekaJerseyClientImpl implements EurekaJerseyClient {
     private static final int HTTPS_PORT = 443;
     private static final String KEYSTORE_TYPE = "JKS";
 
+    //基于 Apache HttpClient4 实现的 Jersey Client
     private final ApacheHttpClient4 apacheHttpClient;
+    //Apache HttpClient 空闲连接清理器
     private final ApacheHttpClientConnectionCleaner apacheHttpClientConnectionCleaner;
 
+    //Jersey Client 配置
     ClientConfig jerseyClientConfig;
 
     public EurekaJerseyClientImpl(int connectionTimeout, int readTimeout, final int connectionIdleTimeout,
                                   ClientConfig clientConfig) {
         try {
             jerseyClientConfig = clientConfig;
+            // 创建  ApacheHttpClient
             apacheHttpClient = ApacheHttpClient4.create(jerseyClientConfig);
+            // 设置 连接参数
             HttpParams params = apacheHttpClient.getClientHandler().getHttpClient().getParams();
 
             HttpConnectionParams.setConnectionTimeout(params, connectionTimeout);
             HttpConnectionParams.setSoTimeout(params, readTimeout);
-
+            // 创建 ApacheHttpClientConnectionCleaner
             this.apacheHttpClientConnectionCleaner = new ApacheHttpClientConnectionCleaner(apacheHttpClient, connectionIdleTimeout);
         } catch (Throwable e) {
             throw new RuntimeException("Cannot create Jersey client", e);
@@ -181,10 +186,20 @@ public class EurekaJerseyClientImpl implements EurekaJerseyClient {
             }
         }
 
+        /*
+        实现自定义配置。点击 链接 查看带中文注释的 MyDefaultApacheHttpClient4Config。例如 ：
+        自定义的请求、响应的编解码器 com.netflix.discovery.provider.DiscoveryJerseyProvider 。
+        禁用重定向，使用 RedirectingEurekaHttpClient 实现该特性。
+        自定义 UserAgent 。
+        自定义 Http Proxy 。
+        SSL 功能的增强。ApacheHttpClient4 使用的是 Apache HttpClient 4.1.1 版本，com.netflix.discovery.shared.transport.jersey.SSLSocketFactoryAdapter 将 Apache HttpClient 4.3.4 对 SSL 功能的增强适配到老版本 API 。点击 链接 查看带中文注释的 SSLSocketFactoryAdapter。
+         */
         class MyDefaultApacheHttpClient4Config extends DefaultApacheHttpClient4Config {
             MyDefaultApacheHttpClient4Config() {
+                // 可监控的连接管理器
                 MonitoredConnectionManager cm;
-
+                //SSL 功能的增强。ApacheHttpClient4 使用的是 Apache HttpClient 4.1.1 版本，
+                //SSL
                 if (systemSSL) {
                     cm = createSystemSslCM();
                 } else if (sslContext != null || trustStoreFileName != null) {
@@ -193,10 +208,12 @@ public class EurekaJerseyClientImpl implements EurekaJerseyClient {
                     cm = createDefaultSslCM();
                 }
 
+                //自定义 Http Proxy
                 if (proxyHost != null) {
                     addProxyConfiguration(cm);
                 }
 
+                //自定义的请求、响应的编解码器 com.netflix.discovery.provider.DiscoveryJerseyProvider
                 DiscoveryJerseyProvider discoveryJerseyProvider = new DiscoveryJerseyProvider(encoderWrapper, decoderWrapper);
                 getSingletons().add(discoveryJerseyProvider);
 
@@ -205,9 +222,11 @@ public class EurekaJerseyClientImpl implements EurekaJerseyClient {
                 cm.setMaxTotal(maxTotalConnections);
                 getProperties().put(ApacheHttpClient4Config.PROPERTY_CONNECTION_MANAGER, cm);
 
+                //自定义 UserAgent
                 String fullUserAgentName = (userAgent == null ? clientName : userAgent) + "/v" + buildVersion();
                 getProperties().put(CoreProtocolPNames.USER_AGENT, fullUserAgentName);
 
+                //禁用重定向，使用 RedirectingEurekaHttpClient 实现该特性
                 // To pin a client to specific server in case redirect happens, we handle redirects directly
                 // (see DiscoveryClient.makeRemoteCall methods).
                 getProperties().put(PROPERTY_FOLLOW_REDIRECTS, Boolean.FALSE);
@@ -230,6 +249,7 @@ public class EurekaJerseyClientImpl implements EurekaJerseyClient {
             private MonitoredConnectionManager createSystemSslCM() {
                 MonitoredConnectionManager cm;
                 SSLConnectionSocketFactory systemSocketFactory = SSLConnectionSocketFactory.getSystemSocketFactory();
+                ////com.netflix.discovery.shared.transport.jersey.SSLSocketFactoryAdapter 将 Apache HttpClient 4.3.4 对 SSL 功能的增强适配到老版本 API
                 SSLSocketFactory sslSocketFactory = new SSLSocketFactoryAdapter(systemSocketFactory);
                 SchemeRegistry sslSchemeRegistry = new SchemeRegistry();
                 sslSchemeRegistry.register(new Scheme(PROTOCOL, HTTPS_PORT, sslSocketFactory));

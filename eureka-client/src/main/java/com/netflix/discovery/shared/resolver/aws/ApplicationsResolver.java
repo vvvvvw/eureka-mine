@@ -16,6 +16,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * @author David Liu
  */
+//这个类和 Eureka 2.x 兼容相关
 public class ApplicationsResolver implements ClusterResolver<AwsEndpoint> {
     private static final Logger logger = LoggerFactory.getLogger(ApplicationsResolver.class);
 

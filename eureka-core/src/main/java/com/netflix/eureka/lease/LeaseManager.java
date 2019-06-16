@@ -30,7 +30,7 @@ import com.netflix.eureka.registry.AbstractInstanceRegistry;
  * <p>
  *
  * @author Karthik Ranganathan, Greg Kim
- *
+ * 租约管理器接口，提供租约的注册、续租、取消( 主动下线 )、过期( 过期下线 )
  * @param <T>
  */
 public interface LeaseManager<T> {
@@ -74,6 +74,23 @@ public interface LeaseManager<T> {
 
     /**
      * Evict {@link T}s with expired {@link Lease}(s).
+     */
+    /*
+    计算公式如下：
+    expectedNumberOfRenewsPerMin = 当前注册的应用实例数 x 2
+    numberOfRenewsPerMinThreshold = expectedNumberOfRenewsPerMin * 续租百分比( eureka.renewalPercentThreshold )
+    为什么乘以 2
+
+    默认情况下，注册的应用实例每半分钟续租一次，那么一分钟心跳两次，因此 x 2 。
+    这块会有一些硬编码的情况，因此不太建议修改应用实例的续租频率。
+
+    为什么乘以续租百分比
+
+    低于这个百分比，意味着开启自我保护机制。
+
+    默认情况下，eureka.renewalPercentThreshold = 0.85 。
+
+    如果你真的调整了续租频率，可以等比去续租百分比，以保证合适的触发自我保护机制的阀值。另外，你需要注意，续租频率是 Client 级别，续租百分比是 Server 级别。
      */
     void evict();
 }

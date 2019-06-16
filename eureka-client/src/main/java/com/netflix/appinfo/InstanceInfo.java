@@ -49,6 +49,7 @@ import org.slf4j.LoggerFactory;
  * serialized as specified by the <code>@Serializer</code>.
  * </p>
  *
+ * 应用实例信息
  * @author Karthik Ranganathan, Greg Kim
  */
 @ProvidedBy(EurekaConfigBasedInstanceInfoProvider.class)
@@ -88,20 +89,26 @@ public class InstanceInfo {
     public static final int DEFAULT_SECURE_PORT = 7002;
     public static final int DEFAULT_COUNTRY_ID = 1; // US
 
+    //实例编号，应用内唯一
     // The (fixed) instanceId for this instanceInfo. This should be unique within the scope of the appName.
     private volatile String instanceId;
 
+    //应用名
     private volatile String appName;
+    //应用分组
     @Auto
     private volatile String appGroupName;
 
+    //IP 地址
     private volatile String ipAddr;
 
     private static final String SID_DEFAULT = "na";
     @Deprecated
     private volatile String sid = SID_DEFAULT;
 
+    //应用 http 端口
     private volatile int port = DEFAULT_PORT;
+    //应用 https 端口
     private volatile int securePort = DEFAULT_SECURE_PORT;
 
     @Auto
@@ -112,8 +119,10 @@ public class InstanceInfo {
     private volatile String healthCheckUrl;
     @Auto
     private volatile String secureHealthCheckUrl;
+    //虚拟主机名
     @Auto
     private volatile String vipAddress;
+    //虚拟安全主机名
     @Auto
     private volatile String secureVipAddress;
     @XStreamOmitField
@@ -132,11 +141,24 @@ public class InstanceInfo {
     private String healthCheckExplicitUrl;
     @Deprecated
     private volatile int countryId = DEFAULT_COUNTRY_ID; // Defaults to US
+    //应用 https 端口是否开启
     private volatile boolean isSecurePortEnabled = false;
+    //应用 http 端口是否开启
     private volatile boolean isUnsecurePortEnabled = true;
     private volatile DataCenterInfo dataCenterInfo;
     private volatile String hostName;
     private volatile InstanceStatus status = InstanceStatus.UP;
+    //应用实例的覆盖状态属性
+    /*
+    调用 Eureka-Server HTTP Restful 接口 apps/${APP_NAME}/${INSTANCE_ID}/status 对应用实例覆盖状态的变更，
+    从而达到主动的、强制的变更应用实例状态。注意，
+    实际不会真的修改 Eureka-Client 应用实例的状态，而是修改在 Eureka-Server 注册的应用实例的状态。
+     */
+    /*
+    todo ?  Eureka-Client 在获取到注册信息时，并且配置 eureka.shouldFilterOnlyUpInstances = true，
+    过滤掉非 InstanceStatus.UP 的应用实例，从而避免调动该实例，
+    以达到应用实例的暂停服务( InstanceStatus.OUT_OF_SERVICE )，而无需关闭应用实例。
+     */
     private volatile InstanceStatus overriddenstatus = InstanceStatus.UNKNOWN;
     @XStreamOmitField
     private volatile boolean isInstanceInfoDirty = false;
@@ -326,12 +348,14 @@ public class InstanceInfo {
         }
     }
 
+    // 只使用 ID 计算 hashcode
     @Override
     public int hashCode() {
         String id = getId();
         return (id == null) ? 31 : (id.hashCode() + 31);
     }
 
+    // 只对比 ID
     @Override
     public boolean equals(Object obj) {
         if (this == obj) {
@@ -1183,6 +1207,7 @@ public class InstanceInfo {
      *
      * @param status overridden status for this instance.
      */
+    //设置此实例的覆盖状态。通常由外部进程设置以禁用实例。
     public synchronized void setOverriddenStatus(InstanceStatus status) {
         if (this.overriddenstatus != status) {
             this.overriddenstatus = status;
@@ -1231,6 +1256,7 @@ public class InstanceInfo {
     /**
      * Sets the dirty flag so that the instance information can be carried to
      * the discovery server on the next heartbeat.
+     * 因为 InstanceInfo 刚被创建时，在 Eureka-Server 不存在，也会被注册
      */
     public synchronized void setIsDirty() {
         isInstanceInfoDirty = true;
@@ -1330,9 +1356,13 @@ public class InstanceInfo {
         return version;
     }
 
+    //操作类型
     public enum ActionType {
+        //添加
         ADDED, // Added in the discovery server
+        //更新
         MODIFIED, // Changed in the discovery server
+        //删除
         DELETED
         // Deleted from the discovery server
     }
@@ -1360,7 +1390,9 @@ public class InstanceInfo {
      *            - The InstanceInfo object of the instance.
      * @return - The zone in which the particular instance belongs to.
      */
+    //获得应用实例自己所在的可用区( zone )。非亚马逊 AWS 环境下，可用区数组的第一个元素就是应用实例自己所在的可用区
     public static String getZone(String[] availZones, InstanceInfo myInfo) {
+        //得到availZones列表中第一个元素
         String instanceZone = ((availZones == null || availZones.length == 0) ? "default"
                 : availZones[0]);
         if (myInfo != null

@@ -9,6 +9,8 @@ import com.netflix.eureka.registry.PeerAwareInstanceRegistryImpl.Action;
  *
  * @author Tomasz Bak
  */
+
+//同步应用实例任务抽象类
 public abstract class InstanceReplicationTask extends ReplicationTask {
 
     /**

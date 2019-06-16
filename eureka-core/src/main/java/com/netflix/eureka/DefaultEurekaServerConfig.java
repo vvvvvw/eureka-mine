@@ -66,13 +66,15 @@ public class DefaultEurekaServerConfig implements EurekaServerConfig {
     private static final String EUREKA_ENVIRONMENT = "eureka.environment";
     private static final Logger logger = LoggerFactory
             .getLogger(DefaultEurekaServerConfig.class);
+    //配置文件对象
     private static final DynamicPropertyFactory configInstance = com.netflix.config.DynamicPropertyFactory
             .getInstance();
+    //配置文件
     private static final DynamicStringProperty EUREKA_PROPS_FILE = DynamicPropertyFactory
             .getInstance().getStringProperty("eureka.server.props",
                     "eureka-server");
     private static final int TIME_TO_WAIT_FOR_REPLICATION = 30000;
-
+    //命名空间
     private String namespace = "eureka.";
 
     // These counters are checked for each HTTP request. Instantiating them per request like for the other
@@ -93,11 +95,14 @@ public class DefaultEurekaServerConfig implements EurekaServerConfig {
     }
 
     public DefaultEurekaServerConfig(String namespace) {
+        // 设置 namespace，为 "." 结尾
         this.namespace = namespace;
+        // 初始化 配置文件对象
         init();
     }
 
     private void init() {
+        // 初始化 配置文件对象
         String env = ConfigurationManager.getConfigInstance().getString(
                 EUREKA_ENVIRONMENT, TEST);
         ConfigurationManager.getConfigInstance().setProperty(
@@ -316,6 +321,9 @@ public class DefaultEurekaServerConfig implements EurekaServerConfig {
                 (10 * 60 * 1000)).get();  // defaults to longer than the asg update interval
     }
 
+
+
+
     @Override
     public long getResponseCacheAutoExpirationInSeconds() {
         return configInstance.getIntProperty(
@@ -480,6 +488,8 @@ public class DefaultEurekaServerConfig implements EurekaServerConfig {
      * @return A map of region name to remote region URL parsed from the property specified above. If there is no
      * property available, then an empty map is returned.
      */
+    //namespace + "remoteRegionUrlsWithName" regionName 和 regionUrl 映射
+    //key:regionName,value:regionUrl
     @Override
     public Map<String, String> getRemoteRegionUrlsWithName() {
         String propName = namespace + "remoteRegionUrlsWithName";
